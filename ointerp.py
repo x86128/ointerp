@@ -246,11 +246,12 @@ def p_term(src):
 
 # SimpleExpression = ["+"|"-"] term {("+"|"-" | "OR") term}.
 def p_simple_expression(src):
-    op = src.npeek('PLUS', 'MINUS')
     e_list = []
+    if op := src.eat('PLUS'):
+        e_list.append(op)
+    elif op := src.eat('MINUS'):
+        e_list.append(op)
     if t1 := p_term(src):
-        if op:
-            e_list.append(op)
         e_list.append(t1)
         while True:
             if op := src.npeek('PLUS', 'MINUS', 'OR'):
@@ -657,10 +658,6 @@ def pprint_consts(indent, consts):
     print(indent, "CONSTS:")
     for cblock in consts:
         print(indent + "  ", cblock[0][1], "=", pprint_expr(cblock[1]))
-        #print(indent + "  ", end=' ')
-        #for c in cblock[1]:
-        #    print(c[1], end=',')
-        #print(' of ', cblock[2][1])
 
 
 def pprint_vars(indent, variables):

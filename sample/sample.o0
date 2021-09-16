@@ -13,6 +13,7 @@ CONST a = 50;
 VAR x, y, r, q, w: INTEGER;
 BEGIN OpenInput; ReadInt(x); ReadInt(y); r := x; q := 0; w := y;
 WHILE w <= r DO w := 2*w END ;
+x := -5;
 WHILE w > y DO
 q := 2*q; w := w DIV 2;
 IF w <= r THEN r := r - w; q := q + 1 ELSIF q < 10 THEN q:=6 ELSE q:= 5 END
