@@ -578,7 +578,7 @@ def p_declarations(src):
                 if not src.eat('EQL'):
                     return src.error('Ожидается =')
                 if c_exp := p_expression(src):
-                    c_list.append([c_name, c_exp])
+                    c_list.append((c_name, c_exp))
                 else:
                     return src.error('Ожидается выражение')
                 if not src.eat('SEMICOLON'):
@@ -651,6 +651,18 @@ def pprint_procs(indent, procs):
         pprint_st_seq(indent + "    ", pbody[2])
 
 
+def pprint_consts(indent, consts):
+    if not consts:
+        return
+    print(indent, "CONSTS:")
+    for cblock in consts:
+        print(indent + "  ", cblock[0][1], "=", pprint_expr(cblock[1]))
+        #print(indent + "  ", end=' ')
+        #for c in cblock[1]:
+        #    print(c[1], end=',')
+        #print(' of ', cblock[2][1])
+
+
 def pprint_vars(indent, variables):
     if not variables:
         return
@@ -663,8 +675,7 @@ def pprint_vars(indent, variables):
 
 
 def pprint_decls(indent, decls):
-    print(indent, "CONSTS:")
-    print(indent + "  ", decls[1])
+    pprint_consts(indent, decls[1])
     print(indent, "TYPES:")
     print(indent + "  ", decls[2])
 
@@ -673,19 +684,19 @@ def pprint_decls(indent, decls):
 
 
 def pprint_while(indent, st):
-    print(indent, 'WHILE', st[1], 'DO')
+    print(indent, 'WHILE', pprint_expr(st[1]), 'DO')
     pprint_st_seq(indent + "  ", st[2])
 
 
 def pprint_if(indent, st):
-    print(indent, "IF", st[1][1])
+    print(indent, "IF", pprint_expr(st[1]))
     if len(st) >= 4:
         print(indent + "  ", st[2])
         pprint_st_seq(indent + " " * 4, st[3])
     if len(st) >= 6 and st[4] == 'ELSIF_BLOCK':
         print(indent + "  ", st[4])
         for elsif in st[5]:
-            print(indent + "    ", "ELISF", elsif[1])
+            print(indent + "    ", "ELSIF", pprint_expr(elsif[1]))
             pprint_st_seq(indent + " " * 6, elsif[2])
         if len(st) >= 8:
             print(indent + "    ", "ELSE")
@@ -693,6 +704,13 @@ def pprint_if(indent, st):
     if len(st) >= 6 and st[4] == 'ELSE':
         print(indent + "  ", st[4])
         pprint_st_seq(indent + " " * 4, st[5])
+
+
+def pprint_actual_pars(ap):
+    res = "("
+    for arg in ap[1]:
+        res += pprint_expr(arg) + " , "
+    return res + ")"
 
 
 def pprint_st_seq(indent, st_seq):
@@ -705,13 +723,45 @@ def pprint_st_seq(indent, st_seq):
         elif st[0] == 'CALL':
             print(indent + "   CALL", st[1][1])
         elif st[0] == 'CALL_P':
-            print(indent + "   CALL_P", st[1][1], st[2][1])
+            print(indent + "   CALL_P", st[1][1], pprint_actual_pars(st[2]))
         elif st[0] == 'ASSIGN':
-            print(indent + "  ", st[1][1], ":=", st[2][1])
+            print(indent + "  ", st[1][1], ":=", pprint_expr(st[2]))
         elif st[0] == 'IF_STAT':
             pprint_if(indent + "  ", st)
         else:
             print(indent + "  ", st)
+
+
+def pprint_expr(e):
+    if e[0] == 'IDENT':
+        return e[1]
+    elif e[0] == 'INTEGER':
+        return e[1]
+    elif e[0] == 'NOT':
+        return pprint_expr(e[1]) + " ~"
+    elif e[0] == 'FACTOR':
+        return pprint_expr(e[1])
+    elif e[0] == 'TERM':
+        ex_list = e[1]
+        if len(ex_list) > 1:
+            return pprint_expr(ex_list[0]) + " " + pprint_expr(('TERM', ex_list[2:])) + " " + ex_list[1][1]
+        else:
+            return pprint_expr(ex_list[0][1])
+    elif e[0] == 'SEXPR':
+        if len(e[1]) == 1:  # SimpleExpression = term
+            return pprint_expr(e[1][0])
+        elif len(e[1]) == 2:  # SimpleExpression = ["+"|"-"] term
+            return pprint_expr(e[1][1]) + " " + "unary" + e[1][0][1]
+        else:
+            return pprint_expr(e[1][0]) + " " + pprint_expr(e[1][2]) + " " + e[1][1][1]
+    elif e[0] == 'EXPR':
+        ex_list = e[1]
+        if len(ex_list) > 1:
+            return pprint_expr(ex_list[0]) + " " + pprint_expr(('EXPR', ex_list[2:])) + " " + ex_list[1][1]
+        else:
+            return pprint_expr(ex_list[0])
+    print(e)
+    return ""
 
 
 def pprint_ast(ast):

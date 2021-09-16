@@ -12,71 +12,89 @@
 
 ```
 MODULE Samples
-   CONSTS:
-     []
    TYPES:
      []
    PROCEDURES:
      Multiply is:
-       CONSTS:
-         []
        TYPES:
          []
        VARS:
          x,y,z, of  INTEGER
        TEXT
-         ('CALL', ('IDENT', 'OpenInput'))
-         ('CALL_P', ('IDENT', 'ReadInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x'))])])])]))
-         ('CALL_P', ('IDENT', 'ReadInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'y'))])])])]))
-         ('ASSIGN', ('IDENT', 'z'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '0'))])])]))
-         WHILE ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x'))])]), ('GTR', '>'), ('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '0'))])])]) DO
-           ('IF_STAT', ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x')), ('MOD', 'MOD'), ('FACTOR', ('INTEGER', '2'))])]), ('EQL', '='), ('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '1'))])])]), 'THEN', ('STAT_SEQ', [('ASSIGN', ('IDENT', 'z'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'z'))]), ('PLUS', '+'), ('TERM', [('FACTOR', ('IDENT', 'y'))])])]))]))
-           ('ASSIGN', ('IDENT', 'y'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '2')), ('TIMES', '*'), ('FACTOR', ('IDENT', 'y'))])])]))
-           ('ASSIGN', ('IDENT', 'x'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x')), ('DIV', 'DIV'), ('FACTOR', ('INTEGER', '2'))])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'y'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'z'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '6'))])])])]))
-         ('CALL', ('IDENT', 'WriteLn'))
+         CALL OpenInput
+         CALL_P ReadInt (x , )
+         CALL_P ReadInt (y , )
+         z := 0
+         WHILE x 0 > DO
+           TEXT
+             IF x 2 MOD 1 =
+               THEN
+                 TEXT
+                   z := z y +
+             y := 2 y *
+             x := x 2 DIV
+         CALL_P WriteInt (x , 4 , )
+         CALL_P WriteInt (y , 4 , )
+         CALL_P WriteInt (z , 6 , )
+         CALL WriteLn
      Divide is:
        CONSTS:
-         [[('IDENT', 'a'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '50'))])])])]]
+         a = 50
        TYPES:
          []
        VARS:
          x,y,r,q,w, of  INTEGER
        TEXT
-         ('CALL', ('IDENT', 'OpenInput'))
-         ('CALL_P', ('IDENT', 'ReadInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x'))])])])]))
-         ('CALL_P', ('IDENT', 'ReadInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'y'))])])])]))
-         ('ASSIGN', ('IDENT', 'r'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x'))])])]))
-         ('ASSIGN', ('IDENT', 'q'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '0'))])])]))
-         ('ASSIGN', ('IDENT', 'w'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'y'))])])]))
-         WHILE ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'w'))])]), ('LEQ', '<='), ('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'r'))])])]) DO
-           ('ASSIGN', ('IDENT', 'w'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '2')), ('TIMES', '*'), ('FACTOR', ('IDENT', 'w'))])])]))
-         WHILE ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'w'))])]), ('GTR', '>'), ('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'y'))])])]) DO
-           ('ASSIGN', ('IDENT', 'q'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '2')), ('TIMES', '*'), ('FACTOR', ('IDENT', 'q'))])])]))
-           ('ASSIGN', ('IDENT', 'w'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'w')), ('DIV', 'DIV'), ('FACTOR', ('INTEGER', '2'))])])]))
-           ('IF_STAT', ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'w'))])]), ('LEQ', '<='), ('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'r'))])])]), 'THEN', ('STAT_SEQ', [('ASSIGN', ('IDENT', 'r'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'r'))]), ('MINUS', '-'), ('TERM', [('FACTOR', ('IDENT', 'w'))])])])), ('ASSIGN', ('IDENT', 'q'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'q'))]), ('PLUS', '+'), ('TERM', [('FACTOR', ('INTEGER', '1'))])])]))]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'x'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'y'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'q'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'r'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-         ('CALL', ('IDENT', 'WriteLn'))
+         CALL OpenInput
+         CALL_P ReadInt (x , )
+         CALL_P ReadInt (y , )
+         r := x
+         q := 0
+         w := y
+         WHILE w r <= DO
+           TEXT
+             w := 2 w *
+         WHILE w y > DO
+           TEXT
+             q := 2 q *
+             w := w 2 DIV
+             IF w r <=
+               THEN
+                 TEXT
+                   r := r w -
+                   q := q 1 +
+               ELSIF_BLOCK
+                 ELSIF q 10 <
+                   TEXT
+                     q := 6
+                 ELSE
+                   TEXT
+                     q := 5
+         CALL_P WriteInt (x , 4 , )
+         CALL_P WriteInt (y , 4 , )
+         CALL_P WriteInt (q , 4 , )
+         CALL_P WriteInt (r , 4 , )
+         CALL WriteLn
      Sum is:
-       CONSTS:
-         []
        TYPES:
          []
        VARS:
          n,s, of  INTEGER
        TEXT
-         ('CALL', ('IDENT', 'OpenInput'))
-         ('ASSIGN', ('IDENT', 's'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '0'))])])]))
-         WHILE ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('NOT', ('FACTOR', ('IDENT', 'eot'))))])])]) DO
-           ('CALL_P', ('IDENT', 'ReadInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'n'))])])])]))
-           ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 'n'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '4'))])])])]))
-           ('ASSIGN', ('IDENT', 's'), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 's'))]), ('PLUS', '+'), ('TERM', [('FACTOR', ('IDENT', 'n'))])])]))
-         ('CALL_P', ('IDENT', 'WriteInt'), ('ACTUAL_PARAMETERS', [('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('IDENT', 's'))])])]), ('EXPR', [('SEXPR', [('TERM', [('FACTOR', ('INTEGER', '6'))])])])]))
-         ('CALL', ('IDENT', 'WriteLn'))
-
+         CALL OpenInput
+         s := 0
+         WHILE eot ~ DO
+           TEXT
+             CALL_P ReadInt (n , )
+             CALL_P WriteInt (n , 4 , )
+             s := s n +
+         CALL_P WriteInt (s , 6 , )
+         CALL WriteLn
+         IF w r <
+           THEN
+             TEXT
+               a := b
+           ELSE
+             TEXT
+               c := d
 ```
