@@ -674,25 +674,8 @@ def pprint_decls(indent, decls):
 
 def pprint_while(indent, st):
     print(indent, 'WHILE', st[1], 'DO')
-    pprint_st_seq(indent + "  ", st[2])
-
-
-def pprint_if(indent, st):
-    print(indent, "IF", st[1][1])
-    if len(st) >= 4:
-        print(indent + "  ", st[2])
-        pprint_st_seq(indent + " " * 4, st[3])
-    if len(st) >= 6 and st[4] == 'ELSIF_BLOCK':
-        print(indent + "  ", st[4])
-        for elsif in st[5]:
-            print(indent + "    ", "ELISF", elsif[1])
-            pprint_st_seq(indent + " " * 6, elsif[2])
-        if len(st) >= 8:
-            print(indent + "    ", "ELSE")
-            pprint_st_seq(indent + " " * 6, st[7])
-    if len(st) >= 6 and st[4] == 'ELSE':
-        print(indent + "  ", st[4])
-        pprint_st_seq(indent + " " * 4, st[5])
+    for s in st[2][1]:
+        print(indent + "  ", s)
 
 
 def pprint_st_seq(indent, st_seq):
@@ -702,14 +685,6 @@ def pprint_st_seq(indent, st_seq):
     for st in st_seq[1]:
         if st[0] == 'WHILE':
             pprint_while(indent + "  ", st)
-        elif st[0] == 'CALL':
-            print(indent + "   CALL", st[1][1])
-        elif st[0] == 'CALL_P':
-            print(indent + "   CALL_P", st[1][1], st[2][1])
-        elif st[0] == 'ASSIGN':
-            print(indent + "  ", st[1][1], ":=", st[2][1])
-        elif st[0] == 'IF_STAT':
-            pprint_if(indent + "  ", st)
         else:
             print(indent + "  ", st)
 
