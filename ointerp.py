@@ -5,7 +5,7 @@ keywords = ["DIV", "MOD", "OR", "OF", "THEN", "DO", "UNTIL", "END", "ELSE", "ELS
 class SourceReader:
     def __init__(self, input_file):
         self.input_file = input_file
-        self.c = self.input_file.read(1)
+        self.c = self.read()
 
     def read(self):
         self.c = self.input_file.read(1)
@@ -56,7 +56,7 @@ class TokenStream:
                 self.src.read()
                 return
             elif len(self.src.peek()) < 1:
-                print('Ошибка: Незакрытый коментарий в строке', tl)
+                print('Ошибка: Незакрытый комментарий в строке', tl)
                 return
 
     def read(self):
@@ -156,8 +156,15 @@ class TokenStream:
         if self.token[0] == tok_type:
             t = self.token
             self.token = self.read()
-            self.pos += 1
             return t
+        return False
+
+    def neat(self, *toks):
+        for t in toks:
+            if self.token[0] == t:
+                temp = self.token
+                self.token = self.read()
+                return temp
         return False
 
     def peek(self, what):
@@ -246,7 +253,7 @@ def p_term(src):
             else:
                 break
         return 'TERM', f_list
-    return src.error("Ожидатся корректное выражение")
+    return src.error("Ожидается корректное выражение")
 
 
 # SimpleExpression = ["+"|"-"] term {("+"|"-" | "OR") term}.
@@ -741,12 +748,17 @@ def pprint_expr(e):
         return pprint_expr(e[1]) + " ~"
     elif e[0] == 'FACTOR':
         return pprint_expr(e[1])
+    elif e[0] == 'FACTOR_SEL':
+        if e[2][0] == 'SELECTOR_EXPR':
+            return e[1][1] + "[" + pprint_expr(e[2][1]) + "]"
+        elif e[2][0] == 'SELECTOR_DOT':
+            return e[1][1] + "." + e[2][1]
     elif e[0] == 'TERM':
         ex_list = e[1]
         if len(ex_list) > 1:
             return pprint_expr(ex_list[0]) + " " + pprint_expr(('TERM', ex_list[2:])) + " " + ex_list[1][1]
         else:
-            return pprint_expr(ex_list[0][1])
+            return pprint_expr(ex_list[0])
     elif e[0] == 'SEXPR':
         if len(e[1]) == 1:  # SimpleExpression = term
             return pprint_expr(e[1][0])
