@@ -18,10 +18,12 @@ class SourceReader:
 class TokenStream:
     def __init__(self, source_file):
         self.src = SourceReader(open(source_file, 'r'))
-        self.token = self.read()
+
         self.line = 1
         self.pos = 0
-        self.buf = []
+        self.errors = []
+
+        self.token = self.read()
 
     def get_int(self):
         integer = self.src.peek()
@@ -60,8 +62,10 @@ class TokenStream:
     def read(self):
         t = ("NULL", "NULL")
         while c := self.src.peek():
+            self.pos += 1
             if c == '\n':
                 self.line += 1
+                self.pos = 0
                 self.src.read()
                 continue
             elif c.isspace():
@@ -73,75 +77,75 @@ class TokenStream:
                 return self.get_int()
             elif c == ';':
                 self.src.read()
-                return 'SEMICOLON', ';'
+                return 'SEMICOLON', ';', self.line, self.pos
             elif c == '*':
                 self.src.read()
-                return 'TIMES', '*'
+                return 'TIMES', '*', self.line, self.pos
             elif c == ',':
                 self.src.read()
-                return 'COMMA', ','
+                return 'COMMA', ',', self.line, self.pos
             elif c == ':':
                 self.src.read()
                 if self.src.peek() == '=':
                     self.src.read()
-                    return 'BECOMES', ':='
+                    return 'BECOMES', ':=', self.line, self.pos - 1
                 else:
-                    return 'COLON', ':'
+                    return 'COLON', ':', self.line, self.pos
             elif c == '(':
                 self.src.read()
                 if self.src.peek() == '*':
                     self.skip_comment()
                 else:
-                    return 'LPAREN', '('
+                    return 'LPAREN', '(', self.line, self.pos
             elif c == ')':
                 self.src.read()
-                return 'RPAREN', ')'
+                return 'RPAREN', ')', self.line, self.pos
             elif c == '[':
                 self.src.read()
-                return 'LBRAK', '['
+                return 'LBRAK', '[', self.line, self.pos
             elif c == ']':
                 self.src.read()
-                return 'RBRAK', ']'
+                return 'RBRAK', ']', self.line, self.pos
             elif c == '>':
                 self.src.read()
                 if self.src.peek() == '=':
                     self.src.read()
-                    return 'GEQ', '>='
+                    return 'GEQ', '>=', self.line, self.pos - 1
                 else:
-                    return 'GTR', '>'
+                    return 'GTR', '>', self.line, self.pos
             elif c == '=':
                 self.src.read()
-                return 'EQL', '='
+                return 'EQL', '=', self.line, self.pos
             elif c == '#':
                 self.src.read()
-                return 'NEQ', '#'
+                return 'NEQ', '#', self.line, self.pos
             elif c == '<':
                 self.src.read()
                 if self.src.peek() == '=':
                     self.src.read()
-                    return 'LEQ', '<='
+                    return 'LEQ', '<=', self.line, self.pos - 1
                 else:
-                    return 'LSS', '<'
+                    return 'LSS', '<', self.line, self.pos
             elif c == '+':
                 self.src.read()
-                return 'PLUS', '+'
+                return 'PLUS', '+', self.line, self.pos
             elif c == '-':
                 self.src.read()
-                return 'MINUS', '-'
+                return 'MINUS', '-', self.line, self.pos
             elif c == '.':
                 self.src.read()
-                return 'PERIOD', '.'
+                return 'PERIOD', '.', self.line, self.pos
             elif c == '~':
                 self.src.read()
-                return 'NOT', '~'
+                return 'NOT', '~', self.line, self.pos
             elif c == '&':
                 self.src.read()
-                return 'AND', '&'
+                return 'AND', '&', self.line, self.pos
             else:
-                print("Неожиданный символ:", c)
+                print("Неожиданный символ:", c, "в строке", self.line, ":", self.pos)
                 break
         else:
-            t = ("EOF", "EOF")
+            t = ("EOF", "EOF", self.line, self.pos)
         return t
 
     def get(self):
@@ -177,7 +181,8 @@ class TokenStream:
         return ""
 
     def error(self, msg):
-        print("Ошибка в строке:", self.line, msg)
+        # print(f"Ошибка в строке:", self.line, msg)
+        self.errors.append(f"Ошибка в строке: {self.line}:{self.pos} {msg}")
         return False
 
 
@@ -247,10 +252,8 @@ def p_term(src):
 # SimpleExpression = ["+"|"-"] term {("+"|"-" | "OR") term}.
 def p_simple_expression(src):
     e_list = []
-    if op := src.eat('PLUS'):
-        e_list.append(op)
-    elif op := src.eat('MINUS'):
-        e_list.append(op)
+    if op := src.npeek('PLUS', 'MINUS'):
+        e_list.append(src.eat(op[0]))
     if t1 := p_term(src):
         e_list.append(t1)
         while True:
@@ -773,4 +776,7 @@ def pprint_ast(ast):
 if __name__ == "__main__":
     source = TokenStream('sample/sample.o0')
     syn_tree = p_module(source)
-    pprint_ast(syn_tree)
+    if source.errors:
+        print(source.errors[0])
+    else:
+        pprint_ast(syn_tree)
