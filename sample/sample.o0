@@ -9,7 +9,7 @@ END ;
 WriteInt(x, 4); WriteInt(y, 4); WriteInt(z, 6); WriteLn
 END Multiply;
 PROCEDURE Divide;
-CONST a = 50;
+CONST a = 50; b= 150; d = 200;
 VAR x, y, r, q, w: INTEGER;
 BEGIN OpenInput; ReadInt(x); ReadInt(y); r := x; q := 0; w := y;
 WHILE w <= r DO w := 2*w END ;

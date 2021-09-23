@@ -1,5 +1,6 @@
-keywords = ["DIV", "MOD", "OR", "OF", "THEN", "DO", "UNTIL", "END", "ELSE", "ELSIF", "IF", "WHILE", "REPEAT",
-            "ARRAY", "RECORD", "CONST", "TYPE", "VAR", "PROCEDURE", "BEGIN", "MODULE"]
+keywords = ["DIV", "MOD", "OR", "OF", "THEN", "DO", "UNTIL", "END", "ELSE",
+            "ELSIF", "IF", "WHILE", "REPEAT", "ARRAY", "RECORD", "CONST",
+            "TYPE", "VAR", "PROCEDURE", "BEGIN", "MODULE"]
 
 
 class SourceReader:
@@ -178,15 +179,6 @@ class TokenStream:
                 return self.token
         return False
 
-    def expect(self, tok_type):
-        if self.token[0] == tok_type:
-            t = self.token[1]
-            self.token = self.read()
-            return t
-        else:
-            print("Ошибка в строке:", self.line, "Ожидаем:", tok_type, "получено:", self.token)
-        return ""
-
     def error(self, msg):
         # print(f"Ошибка в строке:", self.line, msg)
         self.errors.append(f"Ошибка в строке: {self.line}:{self.pos} {msg}")
@@ -213,7 +205,7 @@ def p_selector(src):
             if src.eat('RBRAK'):
                 return 'SELECTOR_EXPR', e1
             return src.error("Ожидается ]")
-        return src.error(f"В выражении селектора ошибка {line}")
+        return src.error("В выражении селектора ошибка")
     return False
 
 
@@ -241,17 +233,12 @@ def p_factor(src):
 def p_term(src):
     if f := p_factor(src):
         f_list = [f]
-        while True:
-            op = src.npeek('TIMES', 'DIV', 'MOD', 'AND')
-            if op:
-                op = src.eat(op[0])
-                if f2 := p_factor(src):
-                    f_list.append(op)
-                    f_list.append(f2)
-                else:
-                    return src.error("Ошибка в выражении")
+        while op := src.neat('TIMES', 'DIV', 'MOD', 'AND'):
+            if f2 := p_factor(src):
+                f_list.append(op)
+                f_list.append(f2)
             else:
-                break
+                return src.error("Ошибка в выражении")
         return 'TERM', f_list
     return src.error("Ожидается корректное выражение")
 
@@ -259,20 +246,16 @@ def p_term(src):
 # SimpleExpression = ["+"|"-"] term {("+"|"-" | "OR") term}.
 def p_simple_expression(src):
     e_list = []
-    if op := src.npeek('PLUS', 'MINUS'):
-        e_list.append(src.eat(op[0]))
+    if op := src.neat('PLUS', 'MINUS'):
+        e_list.append(op)
     if t1 := p_term(src):
         e_list.append(t1)
-        while True:
-            if op := src.npeek('PLUS', 'MINUS', 'OR'):
-                op = src.eat(op[0])
-                if t2 := p_term(src):
-                    e_list.append(op)
-                    e_list.append(t2)
-                else:
-                    return src.error("Ожидается выражение - term")
+        while op := src.neat('PLUS', 'MINUS', 'OR'):
+            if t2 := p_term(src):
+                e_list.append(op)
+                e_list.append(t2)
             else:
-                break
+                return src.error("Ожидается выражение - term")
     else:
         return src.error("Ожидается выражение")
     return 'SEXPR', e_list
@@ -584,40 +567,35 @@ def p_declarations(src):
     v_list = []
     p_list = []
     if src.eat('CONST'):
-        while src.peek('IDENT'):
-            if c_name := src.eat('IDENT'):
-                if not src.eat('EQL'):
-                    return src.error('Ожидается =')
-                if c_exp := p_expression(src):
-                    c_list.append((c_name, c_exp))
-                else:
-                    return src.error('Ожидается выражение')
-                if not src.eat('SEMICOLON'):
-                    return src.error('Ожидается ;')
-    if src.eat('TYPE'):
-        while src.peek('IDENT'):
-            if t_name := src.eat('IDENT'):
-                if not src.eat('EQL'):
-                    return src.error('Ожидается =')
-                if t_type := p_type(src):
-                    t_list.append([t_name, t_type])
-                else:
-                    return src.error('Ожидается выражение')
-                if not src.eat('SEMICOLON'):
-                    return src.error('Ожидается ;')
-    if src.eat('VAR'):
-        while True:
-            if id_list := p_ident_list(src):
-                if not src.eat('COLON'):
-                    return src.error('Ожидается :')
-                if id_type := p_type(src):
-                    v_list.append((id_list[0], id_list[1], id_type))
-                else:
-                    return src.error('Ожидается тип')
-                if not src.eat('SEMICOLON'):
-                    return src.error('Ожидается ;')
+        while c_name := src.eat('IDENT'):
+            if not src.eat('EQL'):
+                return src.error('Ожидается =')
+            if c_exp := p_expression(src):
+                c_list.append((c_name, c_exp))
             else:
-                break
+                return src.error('Ожидается выражение')
+            if not src.eat('SEMICOLON'):
+                return src.error('Ожидается ;')
+    if src.eat('TYPE'):
+        while t_name := src.eat('IDENT'):
+            if not src.eat('EQL'):
+                return src.error('Ожидается =')
+            if t_type := p_type(src):
+                t_list.append((t_name, t_type))
+            else:
+                return src.error('Ожидается выражение')
+            if not src.eat('SEMICOLON'):
+                return src.error('Ожидается ;')
+    if src.eat('VAR'):
+        while id_list := p_ident_list(src):
+            if not src.eat('COLON'):
+                return src.error('Ожидается :')
+            if id_type := p_type(src):
+                v_list.append((id_list[0], id_list[1], id_type))
+            else:
+                return src.error('Ожидается тип')
+            if not src.eat('SEMICOLON'):
+                return src.error('Ожидается ;')
     while True:
         if pd := p_procedure_declaration(src):
             if not src.eat('SEMICOLON'):
@@ -675,10 +653,8 @@ def pprint_vars(indent, variables):
         return
     print(indent, "VARS:")
     for vblock in variables:
-        print(indent + "  ", end=' ')
         for v in vblock[1]:
-            print(v[1], end=',')
-        print(' of ', vblock[2][1])
+            print(indent + "  ", v[1], 'of', vblock[2][1])
 
 
 def pprint_decls(indent, decls):
