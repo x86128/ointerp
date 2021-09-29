@@ -1,3 +1,6 @@
+import sys
+import pprint
+
 keywords = ["DIV", "MOD", "OR", "OF", "THEN", "DO", "UNTIL", "END", "ELSE",
             "ELSIF", "IF", "WHILE", "REPEAT", "ARRAY", "RECORD", "CONST",
             "TYPE", "VAR", "PROCEDURE", "BEGIN", "MODULE"]
@@ -190,7 +193,9 @@ def p_ident(src):
 
 
 def p_integer(src):
-    return src.eat('INTEGER')
+    if integer := src.eat('INTEGER'):
+        return 'INTEGER', int(integer[1])
+    return False
 
 
 # selector = {"." ident | "[" expression "]"}.
@@ -200,7 +205,6 @@ def p_selector(src):
             return 'SELECTOR_DOT', sname[1]
         return src.error(f"Ожидается имя селектора, получено {src.token[0]}")
     elif src.eat('LBRAK'):
-        line = src.line
         if e1 := p_expression(src):
             if src.eat('RBRAK'):
                 return 'SELECTOR_EXPR', e1
@@ -265,8 +269,8 @@ def p_simple_expression(src):
 def p_expression(src):
     s1 = p_simple_expression(src)
     e_list = [s1]
-    while op := src.npeek('EQL', 'NEQ', 'LSS', 'LEQ', 'GTR', 'GEQ'):
-        e_list.append(src.eat(op[0]))
+    if op := src.neat('EQL', 'NEQ', 'LSS', 'LEQ', 'GTR', 'GEQ'):
+        e_list.append(op)
         if s2 := p_simple_expression(src):
             e_list.append(s2)
         else:
@@ -330,21 +334,13 @@ def p_if_stat(src):
         if not (st_seq := p_stat_seq(src)):
             return src.error('Ожидается последовательность выражений после THEN')
         elsif_block.append(('ELSIF', ex_2, st_seq))
+    else_seq = []
     if src.eat('ELSE'):
-        if not (st_seq := p_stat_seq(src)):
+        if not (else_seq := p_stat_seq(src)):
             return src.error('Ожидается последовательность выражений после ELSE')
-        if not src.eat('END'):
-            return src.error("Ожидается завершающий END в IF")
-        if elsif_block:
-            return 'IF_STAT', ex_1, 'THEN', then_block, 'ELSIF_BLOCK', elsif_block, 'ELSE', st_seq
-        else:
-            return 'IF_STAT', ex_1, 'THEN', then_block, 'ELSE', st_seq
     if not src.eat('END'):
         return src.error("Ожидается завершающий END в IF")
-    if elsif_block:
-        return 'IF_STAT', ex_1, 'THEN', then_block, 'ELSIF_BLOCK', elsif_block
-    else:
-        return 'IF_STAT', ex_1, 'THEN', then_block
+    return 'IF_STAT', ex_1, 'THEN', then_block, 'ELSIF_BLOCK', elsif_block, 'ELSE', else_seq
 
 
 # WhileStatement = "WHILE" expression "DO" StatementSequence "END".
@@ -528,7 +524,7 @@ def p_procedure_heading(src):
         if fp := p_formal_parameters(src):
             return 'PROC_HEAD', pname, fp
         else:
-            return 'PROC_HEAD', pname
+            return 'PROC_HEAD', pname, ('FP_LIST', [])
     return src.error('Ожидается имя процедуры')
 
 
@@ -629,46 +625,78 @@ def p_module(src):
         return 'MODULE', m_name[1], m_decls, st_seq
 
 
-def pprint_procs(indent, procs):
-    if not procs:
-        return
-    print(indent, "PROCEDURES:")
-    for pdecl in procs:
-        print(indent + "  ", pdecl[1][1], "is:")
+def pprint_procs(ast):
+    res = {}
+    if not ast:
+        return res
+    for pdecl in ast:
+        phead = pdecl[2]
+        pname = phead[1][1]
+        args = []
+        for phblock in phead[2][1]:
+            for pp in phblock[1][1]:
+                # (name, type)
+                args.append((pp[1], phblock[2][1]))
         pbody = pdecl[3]
-        pprint_decls(indent + "    ", pbody[1])
-        pprint_st_seq(indent + "    ", pbody[2])
+        decls = pprint_decls(pbody[1])
+        for a in args:
+            if a[0] in decls["vars"]:
+                print("Имя аргумента не может совпадать с именем переменной", a[0])
+                sys.exit(1)
+            else:
+                decls["vars"][a[0]] = (0, a[1])
+        text = pprint_st_seq(pbody[2])
+        res[pname] = {"args": args, "decls": decls, "text": text}
+    return res
 
 
-def pprint_consts(indent, consts):
+def pprint_consts(consts):
+    res = {}
     if not consts:
-        return
-    print(indent, "CONSTS:")
+        return res
     for cblock in consts:
-        print(indent + "  ", cblock[0][1], "=", pprint_expr(cblock[1]))
+        if cblock[0][1] in res:
+            print("Переопределение константы", cblock[0][1])
+            sys.exit(1)
+        else:
+            res[cblock[0][1]] = pprint_expr(cblock[1])
+    return res
 
 
-def pprint_vars(indent, variables):
+def pprint_vars(variables):
+    res = {}
     if not variables:
-        return
-    print(indent, "VARS:")
+        return res
     for vblock in variables:
         for v in vblock[1]:
-            print(indent + "  ", v[1], 'of', vblock[2][1])
+            if v[1] in res:
+                print("Переопределение переменной", v[1])
+                sys.exit(1)
+            else:
+                res[v[1]] = (0, vblock[2][1])  # (default value, type)
+    return res
 
 
-def pprint_decls(indent, decls):
-    pprint_consts(indent, decls[1])
-    print(indent, "TYPES:")
-    print(indent + "  ", decls[2])
-
-    pprint_vars(indent, decls[3])
-    pprint_procs(indent, decls[4])
+def pprint_decls(decls):
+    consts = pprint_consts(decls[1])
+    vars = pprint_vars(decls[3])
+    procs = pprint_procs(decls[4])
+    return {"consts": consts, "vars": vars, "procs": procs}
 
 
-def pprint_while(indent, st):
-    print(indent, 'WHILE', pprint_expr(st[1]), 'DO')
-    pprint_st_seq(indent + "  ", st[2])
+label_counter = 0
+
+
+def pprint_while(st):
+    global label_counter
+    text = [('LABEL', f'L{label_counter}')]
+    text += pprint_expr(st[1])
+    text.append(('BR_NONZERO', f'L{label_counter + 1}'))
+    text += pprint_st_seq(st[2])
+    text.append(('BR', f'L{label_counter}'))
+    text.append(('LABEL', f'L{label_counter + 1}'))
+    label_counter += 2
+    return text
 
 
 def pprint_if(indent, st):
@@ -690,75 +718,88 @@ def pprint_if(indent, st):
 
 
 def pprint_actual_pars(ap):
-    res = "("
+    text = []
     for arg in ap[1]:
-        res += pprint_expr(arg) + " , "
-    return res + ")"
+        text += pprint_expr(arg)
+    return text
 
 
-def pprint_st_seq(indent, st_seq):
+def pprint_st_seq(st_seq):
+    text = []
     if not st_seq:
-        return
-    print(indent, 'TEXT')
-    for st in st_seq[1]:
+        return text
+    for i, st in enumerate(st_seq[1]):
         if st[0] == 'WHILE':
-            pprint_while(indent + "  ", st)
+            text += pprint_while(st)
         elif st[0] == 'CALL':
-            print(indent + "   CALL", st[1][1])
+            text += ('CALL', st[1][1])
         elif st[0] == 'CALL_P':
-            print(indent + "   CALL_P", st[1][1], pprint_actual_pars(st[2]))
+            text += pprint_actual_pars(st[2])
+            text.append(('CALL', st[1][1]))
         elif st[0] == 'ASSIGN':
-            print(indent + "  ", st[1][1], ":=", pprint_expr(st[2]))
+            for t in pprint_expr(st[2]):
+                text.append(t)
+            text.append(('STOR', st[1][1]))
         elif st[0] == 'IF_STAT':
-            pprint_if(indent + "  ", st)
+            text += ('IF_STAT', 'zzz')
         else:
-            print(indent + "  ", st)
+            print('Unknown stat:', st)
+    return text
 
 
 def pprint_expr(e):
     if e[0] == 'IDENT':
-        return e[1]
+        return [('LOAD', e[1])]
     elif e[0] == 'INTEGER':
-        return e[1]
+        return [('CONST', e[1])]
     elif e[0] == 'NOT':
-        return pprint_expr(e[1]) + " ~"
+        res = pprint_expr(e[1])
+        res.append(('NOT',))
+        return res
     elif e[0] == 'FACTOR':
         return pprint_expr(e[1])
-    elif e[0] == 'FACTOR_SEL':
-        if e[2][0] == 'SELECTOR_EXPR':
-            return e[1][1] + "[" + pprint_expr(e[2][1]) + "]"
-        elif e[2][0] == 'SELECTOR_DOT':
-            return e[1][1] + "." + e[2][1]
     elif e[0] == 'TERM':
         ex_list = e[1]
         if len(ex_list) > 1:
-            return pprint_expr(ex_list[0]) + " " + pprint_expr(('TERM', ex_list[2:])) + " " + ex_list[1][1]
+            res = pprint_expr(ex_list[0])
+            res += pprint_expr(('TERM', ex_list[2:]))
+            res += [(ex_list[1][1],)]
+            return res
         else:
             return pprint_expr(ex_list[0])
     elif e[0] == 'SEXPR':
         if len(e[1]) == 1:  # SimpleExpression = term
             return pprint_expr(e[1][0])
         elif len(e[1]) == 2:  # SimpleExpression = ["+"|"-"] term
-            return pprint_expr(e[1][1]) + " " + "unary" + e[1][0][1]
+            res = pprint_expr(e[1][1])
+            res.append(("U" + e[1][0][1],))
+            return res
         else:
-            return pprint_expr(e[1][0]) + " " + pprint_expr(e[1][2]) + " " + e[1][1][1]
+            res = pprint_expr(e[1][0])
+            res += pprint_expr(e[1][2])
+            res.append((e[1][1][1],))
+            return res
     elif e[0] == 'EXPR':
         ex_list = e[1]
         if len(ex_list) > 1:
-            return pprint_expr(ex_list[0]) + " " + pprint_expr(('EXPR', ex_list[2:])) + " " + ex_list[1][1]
+            res = pprint_expr(ex_list[0])
+            res += pprint_expr(('EXPR', ex_list[2:]))
+            res.append((ex_list[1][1],))
+            return res
         else:
             return pprint_expr(ex_list[0])
-    print(e)
+    print("Unknown expr", e)
     return ""
 
 
 def pprint_ast(ast):
-    indent = ""
     if not (ast[0] == 'MODULE'):
         return
     print('MODULE', ast[1])
-    pprint_decls(indent + "  ", ast[2])
-    pprint_st_seq(indent + "  ", ast[3])
+    decls = pprint_decls(ast[2])
+    iops = pprint_st_seq(ast[3])
+    pprint.pprint(decls)
+    pprint.pprint({"text": iops})
 
 
 if __name__ == "__main__":
