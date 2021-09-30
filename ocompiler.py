@@ -73,7 +73,7 @@ def compile_while(st):
     label_counter += 2
     text = [('LABEL', f'L{label}')]
     text += compile_expression(st[1])
-    text.append(('BR_NONZERO', f'L{label + 1}'))
+    text.append(('BR_ZERO', f'L{label + 1}'))
     text += compile_statements(st[2])
     text.append(('BR', f'L{label}'))
     text.append(('LABEL', f'L{label + 1}'))
@@ -182,4 +182,5 @@ def compile_module(ast):
     print('MODULE', ast[1])
     decls = compile_decls(ast[2])
     text = compile_statements(ast[3])
+    text.append(('STOP', ''))
     return {'name': ast[1], 'decls': decls, 'text': text}

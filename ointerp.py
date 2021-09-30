@@ -2,6 +2,7 @@ import pprint
 from olexer import TokenStream
 from oparser import parse_module
 from ocompiler import compile_module
+from ovm import run_code
 
 if __name__ == "__main__":
     source = TokenStream('sample/sample.o0')
@@ -11,4 +12,4 @@ if __name__ == "__main__":
     else:
         module = compile_module(syn_tree)
         pprint.pprint(module)
-
+        run_code(module)
