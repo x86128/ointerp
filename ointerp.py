@@ -645,7 +645,11 @@ def pprint_procs(ast):
                 sys.exit(1)
             else:
                 decls["vars"][a[0]] = (0, a[1])
-        text = pprint_st_seq(pbody[2])
+        # generating body text
+        text = []
+        for v in args[::-1]:
+            text.append(('STOR', v[0]))
+        text += pprint_st_seq(pbody[2])
         res[pname] = {"args": args, "decls": decls, "text": text}
     return res
 
@@ -679,15 +683,15 @@ def pprint_vars(variables):
 
 def pprint_decls(decls):
     consts = pprint_consts(decls[1])
-    vars = pprint_vars(decls[3])
+    variables = pprint_vars(decls[3])
     procs = pprint_procs(decls[4])
-    return {"consts": consts, "vars": vars, "procs": procs}
+    return {"consts": consts, "vars": variables, "procs": procs}
 
 
 label_counter = 0
 
 
-def pprint_while(st):
+def compile_while(st):
     global label_counter
     text = [('LABEL', f'L{label_counter}')]
     text += pprint_expr(st[1])
@@ -699,22 +703,22 @@ def pprint_while(st):
     return text
 
 
-def pprint_if(indent, st):
-    print(indent, "IF", pprint_expr(st[1]))
-    if len(st) >= 4:
-        print(indent + "  ", st[2])
-        pprint_st_seq(indent + " " * 4, st[3])
-    if len(st) >= 6 and st[4] == 'ELSIF_BLOCK':
-        print(indent + "  ", st[4])
-        for elsif in st[5]:
-            print(indent + "    ", "ELSIF", pprint_expr(elsif[1]))
-            pprint_st_seq(indent + " " * 6, elsif[2])
-        if len(st) >= 8:
-            print(indent + "    ", "ELSE")
-            pprint_st_seq(indent + " " * 6, st[7])
-    if len(st) >= 6 and st[4] == 'ELSE':
-        print(indent + "  ", st[4])
-        pprint_st_seq(indent + " " * 4, st[5])
+# def pprint_if(indent, st):
+#     print(indent, "IF", pprint_expr(st[1]))
+#     if len(st) >= 4:
+#         print(indent + "  ", st[2])
+#         pprint_st_seq(indent + " " * 4, st[3])
+#     if len(st) >= 6 and st[4] == 'ELSIF_BLOCK':
+#         print(indent + "  ", st[4])
+#         for elsif in st[5]:
+#             print(indent + "    ", "ELSIF", pprint_expr(elsif[1]))
+#             pprint_st_seq(indent + " " * 6, elsif[2])
+#         if len(st) >= 8:
+#             print(indent + "    ", "ELSE")
+#             pprint_st_seq(indent + " " * 6, st[7])
+#     if len(st) >= 6 and st[4] == 'ELSE':
+#         print(indent + "  ", st[4])
+#         pprint_st_seq(indent + " " * 4, st[5])
 
 
 def pprint_actual_pars(ap):
@@ -730,7 +734,7 @@ def pprint_st_seq(st_seq):
         return text
     for i, st in enumerate(st_seq[1]):
         if st[0] == 'WHILE':
-            text += pprint_while(st)
+            text += compile_while(st)
         elif st[0] == 'CALL':
             text += ('CALL', st[1][1])
         elif st[0] == 'CALL_P':
@@ -763,7 +767,7 @@ def pprint_expr(e):
         if len(ex_list) > 1:
             res = pprint_expr(ex_list[0])
             res += pprint_expr(('TERM', ex_list[2:]))
-            res += [(ex_list[1][1],)]
+            res += [('BINOP', ex_list[1][1])]
             return res
         else:
             return pprint_expr(ex_list[0])
@@ -772,19 +776,22 @@ def pprint_expr(e):
             return pprint_expr(e[1][0])
         elif len(e[1]) == 2:  # SimpleExpression = ["+"|"-"] term
             res = pprint_expr(e[1][1])
-            res.append(("U" + e[1][0][1],))
+            res.append(("UNARY", e[1][0][1]))
             return res
         else:
             res = pprint_expr(e[1][0])
             res += pprint_expr(e[1][2])
-            res.append((e[1][1][1],))
+            res.append(("BINOP", e[1][1][1]))
+            for i in range(3, len(e[1]), 2):
+                res += pprint_expr(e[1][i + 1])
+                res.append(("BINOP", e[1][i][1]))
             return res
     elif e[0] == 'EXPR':
         ex_list = e[1]
         if len(ex_list) > 1:
             res = pprint_expr(ex_list[0])
             res += pprint_expr(('EXPR', ex_list[2:]))
-            res.append((ex_list[1][1],))
+            res.append(('RELOP', ex_list[1][1]))
             return res
         else:
             return pprint_expr(ex_list[0])

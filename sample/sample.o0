@@ -13,6 +13,6 @@ begin
 end gcd;
 
 begin
-    gcd(15+6,3)
+    gcd(15+6*2-(5 div 8),3)
 
 END Samples.
