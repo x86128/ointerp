@@ -6,95 +6,69 @@
 
 Реализован **только парсер**, практически без проверок ошибок. Выдает не всегда адекватне сообщения об ошибках :)
 
-Создан минимальный pretty printer для AST.
+Для тестового примера:
 
-Выхлоп для тестового примера выглядит примерно так:
+```pascal
+MODULE Samples;
+
+procedure gcd(a,b : integer);
+    var t : integer;
+begin
+    while b > 0 do
+        t := b;
+        b := a mod b;
+        a := t
+    end;
+
+    writeint(a)
+end gcd;
+
+begin
+    gcd(15+6*2-(5 div 8),3)
+
+END Samples.
+```
+
+Интерпретатор генерирует такой код (абстрактной виртуальной машины):
 
 ```
 MODULE Samples
-   TYPES:
-     []
-   PROCEDURES:
-     Multiply is:
-       TYPES:
-         []
-       VARS:
-         x,y,z, of  INTEGER
-       TEXT
-         CALL OpenInput
-         CALL_P ReadInt (x , )
-         CALL_P ReadInt (y , )
-         z := 0
-         WHILE x 0 > DO
-           TEXT
-             IF x 2 MOD 1 =
-               THEN
-                 TEXT
-                   z := z y +
-             y := 2 y *
-             x := x 2 DIV
-         CALL_P WriteInt (x , 4 , )
-         CALL_P WriteInt (y , 4 , )
-         CALL_P WriteInt (z , 6 , )
-         CALL WriteLn
-     Divide is:
-       CONSTS:
-         a = 50
-       TYPES:
-         []
-       VARS:
-         x,y,r,q,w, of  INTEGER
-       TEXT
-         CALL OpenInput
-         CALL_P ReadInt (x , )
-         CALL_P ReadInt (y , )
-         r := x
-         q := 0
-         w := y
-         WHILE w r <= DO
-           TEXT
-             w := 2 w *
-         WHILE w y > DO
-           TEXT
-             q := 2 q *
-             w := w 2 DIV
-             IF w r <=
-               THEN
-                 TEXT
-                   r := r w -
-                   q := q 1 +
-               ELSIF_BLOCK
-                 ELSIF q 10 <
-                   TEXT
-                     q := 6
-                 ELSE
-                   TEXT
-                     q := 5
-         CALL_P WriteInt (x , 4 , )
-         CALL_P WriteInt (y , 4 , )
-         CALL_P WriteInt (q , 4 , )
-         CALL_P WriteInt (r , 4 , )
-         CALL WriteLn
-     Sum is:
-       TYPES:
-         []
-       VARS:
-         n,s, of  INTEGER
-       TEXT
-         CALL OpenInput
-         s := 0
-         WHILE eot ~ DO
-           TEXT
-             CALL_P ReadInt (n , )
-             CALL_P WriteInt (n , 4 , )
-             s := s n +
-         CALL_P WriteInt (s , 6 , )
-         CALL WriteLn
-         IF w r <
-           THEN
-             TEXT
-               a := b
-           ELSE
-             TEXT
-               c := d
+{'consts': {},
+ 'procs': {'gcd': {'args': [('a', 'integer'), ('b', 'integer')],
+                   'decls': {'consts': {},
+                             'procs': {},
+                             'vars': {'a': (0, 'integer'),
+                                      'b': (0, 'integer'),
+                                      't': (0, 'integer')}},
+                   'text': [('STOR', 'b'),
+                            ('STOR', 'a'),
+                            ('LABEL', 'L0'),
+                            ('LOAD', 'b'),
+                            ('CONST', '0'),
+                            ('RELOP', '>'),
+                            ('BR_NONZERO', 'L1'),
+                            ('LOAD', 'b'),
+                            ('STOR', 't'),
+                            ('LOAD', 'a'),
+                            ('LOAD', 'b'),
+                            ('BINOP', 'mod'),
+                            ('STOR', 'b'),
+                            ('LOAD', 't'),
+                            ('STOR', 'a'),
+                            ('BR', 'L0'),
+                            ('LABEL', 'L1'),
+                            ('LOAD', 'a'),
+                            ('CALL', 'writeint')]}},
+ 'vars': {}}
+{'text': [('CONST', '15'),
+          ('CONST', '6'),
+          ('CONST', '2'),
+          ('BINOP', '*'),
+          ('BINOP', '+'),
+          ('CONST', '5'),
+          ('CONST', '8'),
+          ('BINOP', 'div'),
+          ('BINOP', '-'),
+          ('CONST', '3'),
+          ('CALL', 'gcd')]}
 ```
