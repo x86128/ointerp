@@ -10,12 +10,13 @@ system_procs = {'writeint': writeint}
 
 def exec_text(frame_stack, data_stack, module):
     pc = 0
-    pc_next = 0
     text = module['text']
+    # fill labels with addresses
     labels = dict()
     for i, v in enumerate(text):
         if v[0] == 'LABEL':
             labels[v[1]] = i
+    # exec instructions
     while pc < len(text):
         cmd = text[pc]
         pc_next = pc + 1
@@ -38,8 +39,17 @@ def exec_text(frame_stack, data_stack, module):
                 t = data_stack.pop()
                 t = data_stack.pop() % t
                 data_stack.append(t)
+            elif cmd[1] == 'div':
+                t = data_stack.pop()
+                t = int(data_stack.pop() / t)
+                data_stack.append(t)
+            elif cmd[1] == '-':
+                t = data_stack.pop()
+                t = data_stack.pop() - t
+                data_stack.append(t)
             else:
                 print('Unknown BINOP', cmd)
+                break
         elif op == 'CALL':
             if cmd[1] in system_procs:
                 system_procs[cmd[1]](data_stack)
