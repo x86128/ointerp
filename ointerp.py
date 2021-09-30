@@ -693,13 +693,14 @@ label_counter = 0
 
 def compile_while(st):
     global label_counter
-    text = [('LABEL', f'L{label_counter}')]
-    text += pprint_expr(st[1])
-    text.append(('BR_NONZERO', f'L{label_counter + 1}'))
-    text += pprint_st_seq(st[2])
-    text.append(('BR', f'L{label_counter}'))
-    text.append(('LABEL', f'L{label_counter + 1}'))
+    label = label_counter
     label_counter += 2
+    text = [('LABEL', f'L{label}')]
+    text += pprint_expr(st[1])
+    text.append(('BR_NONZERO', f'L{label + 1}'))
+    text += pprint_st_seq(st[2])
+    text.append(('BR', f'L{label}'))
+    text.append(('LABEL', f'L{label + 1}'))
     return text
 
 
