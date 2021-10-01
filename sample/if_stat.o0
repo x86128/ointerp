@@ -1,0 +1,15 @@
+MODULE Samples;
+var t1 : integer;
+
+begin
+
+    t1 := 10;
+    if t1 = 10 then
+        writeint(10)
+    elsif t1 < 0 then
+        writeint(-5)
+    else
+        writeint(44)
+    end
+
+END Samples.
