@@ -1,15 +1,19 @@
 MODULE Samples;
+const
+    pass = 12345;
+    fail = 54321;
+
 var t1 : integer;
 
 begin
 
     t1 := 10;
     if t1 = 10 then
-        writeint(10)
+        writeint(pass)
     elsif t1 < 0 then
-        writeint(-5)
+        writeint(fail)
     else
-        writeint(44)
+        writeint(fail)
     end
 
 END Samples.

@@ -33,7 +33,7 @@ class TokenStream:
                 integer += c
             else:
                 break
-        return 'INTEGER', integer
+        return 'INTEGER', int(integer)
 
     def get_ident(self):
         ident = self.src.peek()

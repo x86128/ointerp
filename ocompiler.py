@@ -31,6 +31,45 @@ def compile_procs(ast):
     return res
 
 
+def eval_static_const_expr(consts, text):
+    stack = []
+    for instr in text:
+        if instr[0] == 'CONST':
+            stack.append(instr[1])
+        elif instr[0] == 'LOAD':
+            if instr[1] in consts:
+                stack.append(consts[instr[1]])
+            else:
+                print('Undefined const', instr[1])
+                sys.exit(1)
+        elif instr[0] == 'BINOP':
+            if instr[1] == '+':
+                stack.append(stack.pop() + stack.pop())
+            if instr[1] == '-':
+                t = stack.pop()
+                stack.append(stack.pop() - t)
+            if instr[1] == '*':
+                stack.append(stack.pop() * stack.pop())
+            if instr[1] == 'div':
+                t = stack.pop()
+                stack.append(int(stack.pop() / t))
+            elif instr[1] == 'mod':
+                t = stack.pop()
+                stack.append(stack.pop() % t)
+            else:
+                print('Unknown instruction in const expr', instr)
+        elif instr[0] == 'UNARY':
+            if instr[1] == '+':
+                pass
+            elif instr[1] == '-':
+                stack.append(-stack.pop())
+            else:
+                print('Unknown unary in const expr', instr)
+        else:
+            print('Unknown op in const expr', instr)
+    return stack.pop()
+
+
 def compile_consts(consts):
     res = {}
     if not consts:
@@ -40,7 +79,8 @@ def compile_consts(consts):
             print("Переопределение константы", cblock[0][1])
             sys.exit(1)
         else:
-            res[cblock[0][1]] = compile_expression(cblock[1])
+            t = compile_expression(cblock[1])
+            res[cblock[0][1]] = eval_static_const_expr(res, t)
     return res
 
 
@@ -172,12 +212,17 @@ def compile_expression(e):
     elif e[0] == 'SEXPR':
         if len(e[1]) == 1:  # SimpleExpression = term
             return compile_expression(e[1][0])
-        elif len(e[1]) == 2:  # SimpleExpression = ["+"|"-"] term
+        elif len(e[1]) >= 2 and e[1][0][0] in ['PLUS', 'MINUS']:  # SimpleExpression = ["+"|"-"] term
             res = compile_expression(e[1][1])
             res.append(("UNARY", e[1][0][1]))
+            for i in range(2, len(e[1]), 2):
+                res += compile_expression(e[1][i+1])
+                res.append(("BINOP", e[1][i][1]))
             return res
-        else:
+        else:  # # SimpleExpression = term { ("+"|"-"|"OR") term}
+            print(e)
             res = compile_expression(e[1][0])
+            print(res)
             res += compile_expression(e[1][2])
             res.append(("BINOP", e[1][1][1]))
             for i in range(3, len(e[1]), 2):

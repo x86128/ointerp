@@ -8,7 +8,7 @@ def writeint(stack):
 system_procs = {'writeint': writeint}
 
 
-def exec_text(frame_stack, data_stack, module):
+def exec_text(frame_stack, const_stack, data_stack, module):
     pc = 0
     text = module['text']
     # fill labels with addresses
@@ -25,7 +25,7 @@ def exec_text(frame_stack, data_stack, module):
             print(f'STOP at {pc}')
             break
         elif op == 'CONST':
-            data_stack.append(int(cmd[1]))
+            data_stack.append(cmd[1])
         elif op == 'UNARY':
             if cmd[1] == '-':
                 data_stack.append(-data_stack.pop())
@@ -64,7 +64,8 @@ def exec_text(frame_stack, data_stack, module):
             elif cmd[1] in module['decls']['procs']:
                 proc = module['decls']['procs'][cmd[1]]
                 frame_stack.append(proc['decls']['vars'])
-                exec_text(frame_stack, data_stack, proc)
+                const_stack.append(proc['decls']['consts'])
+                exec_text(frame_stack, const_stack, data_stack, proc)
             else:
                 print('Undefined procedure', cmd[1])
                 break
@@ -84,7 +85,12 @@ def exec_text(frame_stack, data_stack, module):
                     data_stack.append(env[cmd[1]][0])
                     found = True
             if not found:
-                print(f'Variable {cmd[1]} undefined')
+                for env in const_stack[::-1]:
+                    if cmd[1] in env:
+                        data_stack.append(env[cmd[1]])
+                        found = True
+            if not found:
+                print(f'Variable or constant: {cmd[1]} undefined')
                 break
         elif op == 'RELOP':
             if cmd[1] == '>':
@@ -127,4 +133,4 @@ def exec_text(frame_stack, data_stack, module):
 
 
 def run_code(module):
-    exec_text([module['decls']['vars']], [], module)
+    exec_text([module['decls']['vars']], [module['decls']['consts']], [], module)
