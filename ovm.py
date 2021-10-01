@@ -1,4 +1,4 @@
-import pprint
+import sys
 
 
 def writeint(stack):
@@ -26,6 +26,14 @@ def exec_text(frame_stack, data_stack, module):
             break
         elif op == 'CONST':
             data_stack.append(int(cmd[1]))
+        elif op == 'UNARY':
+            if cmd[1] == '-':
+                data_stack.append(-data_stack.pop())
+            elif cmd[1] == '+':
+                pass
+            else:
+                print('Unknown unary OP', cmd[1])
+                break
         elif op == 'BINOP':
             if cmd[1] == '+':
                 t = data_stack.pop()
@@ -82,6 +90,24 @@ def exec_text(frame_stack, data_stack, module):
             if cmd[1] == '>':
                 t = data_stack.pop()
                 if data_stack.pop() > t:
+                    data_stack.append(1)
+                else:
+                    data_stack.append(0)
+            elif cmd[1] == '<':
+                t = data_stack.pop()
+                if data_stack.pop() < t:
+                    data_stack.append(1)
+                else:
+                    data_stack.append(0)
+            elif cmd[1] == '#':
+                t = data_stack.pop()
+                if data_stack.pop() != t:
+                    data_stack.append(1)
+                else:
+                    data_stack.append(0)
+            elif cmd[1] == '=':
+                t = data_stack.pop()
+                if data_stack.pop() == t:
                     data_stack.append(1)
                 else:
                     data_stack.append(0)

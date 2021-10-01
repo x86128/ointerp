@@ -1,3 +1,4 @@
+import pprint
 import sys
 
 
@@ -80,22 +81,42 @@ def compile_while(st):
     return text
 
 
-# def pprint_if(indent, st):
-#     print(indent, "IF", pprint_expr(st[1]))
-#     if len(st) >= 4:
-#         print(indent + "  ", st[2])
-#         pprint_st_seq(indent + " " * 4, st[3])
-#     if len(st) >= 6 and st[4] == 'ELSIF_BLOCK':
-#         print(indent + "  ", st[4])
-#         for elsif in st[5]:
-#             print(indent + "    ", "ELSIF", pprint_expr(elsif[1]))
-#             pprint_st_seq(indent + " " * 6, elsif[2])
-#         if len(st) >= 8:
-#             print(indent + "    ", "ELSE")
-#             pprint_st_seq(indent + " " * 6, st[7])
-#     if len(st) >= 6 and st[4] == 'ELSE':
-#         print(indent + "  ", st[4])
-#         pprint_st_seq(indent + " " * 4, st[5])
+def compile_if(st):
+    global label_counter
+    text = []
+    # labels allocation
+    label = label_counter
+    ex = st[1]
+    then = st[3]
+    # label for elsif block
+    elsif_label = label
+    elsif = st[5]
+    else_label = elsif_label + len(elsif)
+    elseb = st[7]
+    exit_label = else_label + len(elseb)
+    label_counter = exit_label + 1
+    # compiling IF expression
+    text += compile_expression(ex)
+    if len(elsif) > 0:
+        text.append(('BR_ZERO', f'L{elsif_label}'))
+    else:
+        text.append(('BR_ZERO', f'L{exit_label}'))
+    text += compile_statements(then)
+    if len(elseb) > 0 or len(elsif) > 0:
+        text.append(('BR', f'L{exit_label}'))
+    # compiling ELSIF blocks if any
+    for i, elsifb in enumerate(elsif):
+        text.append(('LABEL', f'L{elsif_label}'))
+        text += compile_expression(elsifb[1])
+        text.append(('BR_ZERO', f'L{elsif_label + i + 1}'))
+        text += compile_statements(elsifb[2])
+        text.append(('BR', f'L{exit_label}'))
+    # compiling ELSE block if any
+    if len(elseb) > 0:
+        text.append(('LABEL', f'L{else_label}'))
+        text += compile_statements(elseb)
+    text.append(('LABEL', f'L{exit_label}'))
+    return text
 
 
 def compile_args(ap):
@@ -122,7 +143,7 @@ def compile_statements(st_seq):
                 text.append(t)
             text.append(('STOR', st[1][1]))
         elif st[0] == 'IF_STAT':
-            text += ('IF_STAT', 'zzz')
+            text += compile_if(st)
         else:
             print('Unknown stat:', st)
     return text

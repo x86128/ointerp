@@ -1,4 +1,5 @@
 MODULE Samples;
+var t1 : integer;
 
 procedure gcd(a,b : integer);
     var t : integer;
@@ -13,6 +14,15 @@ begin
 end gcd;
 
 begin
-    gcd(27+25*3-(10 div 5),15)
+    gcd(27+25*3-(10 div 5),15);
+
+    t1 := 10;
+    if t1 = 10 then
+        writeint(10)
+    elsif t1 < 0 then
+        writeint(-5)
+    else
+        writeint(44)
+    end
 
 END Samples.
