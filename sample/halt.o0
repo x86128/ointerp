@@ -1,0 +1,9 @@
+MODULE Halt;
+const
+    pass = 12345;
+    fail = 54321;
+
+begin
+
+    halt(pass)
+END Halt.

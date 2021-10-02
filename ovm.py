@@ -1,11 +1,29 @@
 import sys
 
 
+# system internal procedures
 def writeint(stack):
     print(stack.pop())
 
 
-system_procs = {'writeint': writeint}
+# halt magic numbers
+PASS = 12345
+FAIL = 54321
+
+
+def halt(stack):
+    code = stack.pop()
+    print('Program halted with code:', code)
+    if code == PASS:
+        print('SUCCESS')
+        sys.exit(0)
+    elif code == FAIL:
+        print('FAIL')
+        sys.exit(1)
+    sys.exit(code)
+
+
+system_procs = {'writeint': writeint, 'halt': halt}
 
 
 def exec_text(frame_stack, const_stack, data_stack, module):
