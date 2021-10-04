@@ -2,32 +2,31 @@ import pprint
 import sys
 
 
-def compile_procs(ast):
+def compile_procs(procs):
     res = {}
-    if not ast:
+    if not procs:
         return res
-    for pdecl in ast:
-        phead = pdecl[2]
-        pname = phead[1][1]
-        args = []
-        for phblock in phead[2][1]:
-            for pp in phblock[1][1]:
-                # (name, type)
-                args.append((pp[1], phblock[2][1]))
-        pbody = pdecl[3]
-        decls = compile_decls(pbody[1])
-        for a in args:
-            if a[0] in decls["vars"]:
-                print("Имя аргумента не может совпадать с именем переменной", a[0])
-                sys.exit(1)
-            else:
-                decls["vars"][a[0]] = (0, a[1])
+    arg_list = []
+    for proc in procs:
+        if proc.name in res:
+            print("Переопределение процедуры", proc.name)
+            sys.exit(1)
+        decls = compile_decls(proc.body.decls)
+        for args in proc.head.fp.fp_list:
+            for arg in args.id_list.id_list:
+                if arg in decls["vars"]:
+                    print("Имя аргумента не может совпадать с именем переменной", a[0])
+                    sys.exit(1)
+                else:
+                    decls["vars"][arg] = (0, args.type.type)
+                    arg_list.append((arg, args.type.type))
         # generating body text
         text = []
-        for v in args[::-1]:
+
+        for v in arg_list[::-1]:
             text.append(('STOR', v[0]))
-        text += compile_statements(pbody[2])
-        res[pname] = {"args": args, "decls": decls, "text": text}
+        text += compile_statements(proc.body.st_seq)
+        res[proc.name] = {"args": arg_list, "decls": decls, "text": text}
     return res
 
 
@@ -74,13 +73,13 @@ def compile_consts(consts):
     res = {}
     if not consts:
         return res
-    for cblock in consts:
-        if cblock[0][1] in res:
-            print("Переопределение константы", cblock[0][1])
+    for const in consts:
+        if const.name in res:
+            print("Переопределение константы", const.name)
             sys.exit(1)
         else:
-            t = compile_expression(cblock[1])
-            res[cblock[0][1]] = eval_static_const_expr(res, t)
+            t = compile_expression(const.expr)
+            res[const.name] = eval_static_const_expr(res, t)
     return res
 
 
@@ -88,20 +87,19 @@ def compile_vars(variables):
     res = {}
     if not variables:
         return res
-    for vblock in variables:
-        for v in vblock[1]:
-            if v[1] in res:
-                print("Переопределение переменной", v[1])
-                sys.exit(1)
-            else:
-                res[v[1]] = (0, vblock[2][1])  # (default value, type)
+    for v in variables:
+        if v.name in res:
+            print("Переопределение переменной", v.name)
+            sys.exit(1)
+        else:
+            res[v.name] = (0, v.type.type)  # (default value, type)
     return res
 
 
 def compile_decls(decls):
-    consts = compile_consts(decls[1])
-    variables = compile_vars(decls[3])
-    procs = compile_procs(decls[4])
+    consts = compile_consts(decls.c_list)
+    variables = compile_vars(decls.v_list)
+    procs = compile_procs(decls.p_list)
     return {"consts": consts, "vars": variables, "procs": procs}
 
 
@@ -113,9 +111,9 @@ def compile_while(st):
     label = label_counter
     label_counter += 2
     text = [('LABEL', f'L{label}')]
-    text += compile_expression(st[1])
+    text += compile_expression(st.expr)
     text.append(('BR_ZERO', f'L{label + 1}'))
-    text += compile_statements(st[2])
+    text += compile_statements(st.st_seq)
     text.append(('BR', f'L{label}'))
     text.append(('LABEL', f'L{label + 1}'))
     return text
@@ -126,42 +124,38 @@ def compile_if(st):
     text = []
     # labels allocation
     label = label_counter
-    ex = st[1]
-    then = st[3]
     # label for elsif block
     elsif_label = label
-    elsif = st[5]
-    else_label = elsif_label + len(elsif)
-    elseb = st[7]
-    exit_label = else_label + len(elseb)
+    else_label = elsif_label + len(st.elsif_block)
+    exit_label = else_label + len(st.else_block)
     label_counter = exit_label + 1
     # compiling IF expression
-    text += compile_expression(ex)
-    if len(elsif) > 0:
+    text += compile_expression(st.expr)
+    if len(st.elsif_block) > 0:
         text.append(('BR_ZERO', f'L{elsif_label}'))
     else:
         text.append(('BR_ZERO', f'L{exit_label}'))
-    text += compile_statements(then)
-    if len(elseb) > 0 or len(elsif) > 0:
+    text += compile_statements(st.then_block)
+    if len(st.else_block) > 0 or len(st.elsif_block) > 0:
         text.append(('BR', f'L{exit_label}'))
     # compiling ELSIF blocks if any
-    for i, elsifb in enumerate(elsif):
+    for i, elsifb in enumerate(st.elsif_block):
         text.append(('LABEL', f'L{elsif_label}'))
-        text += compile_expression(elsifb[1])
+        text += compile_expression(elsifb.expr)
         text.append(('BR_ZERO', f'L{elsif_label + i + 1}'))
-        text += compile_statements(elsifb[2])
+        text += compile_statements(elsifb.st_seq)
         text.append(('BR', f'L{exit_label}'))
     # compiling ELSE block if any
-    if len(elseb) > 0:
+    if len(st.else_block) > 0:
         text.append(('LABEL', f'L{else_label}'))
-        text += compile_statements(elseb)
+        text += compile_statements(st.else_block[0])
     text.append(('LABEL', f'L{exit_label}'))
     return text
 
 
 def compile_args(ap):
     text = []
-    for arg in ap[1]:
+    for arg in ap.arg_list:
         text += compile_expression(arg)
     return text
 
@@ -170,19 +164,19 @@ def compile_statements(st_seq):
     text = []
     if not st_seq:
         return text
-    for i, st in enumerate(st_seq[1]):
-        if st[0] == 'WHILE':
+    for i, st in enumerate(st_seq.st_seq):
+        if st.typ == 'WHILE':
             text += compile_while(st)
-        elif st[0] == 'CALL':
-            text += ('CALL', st[1][1])
-        elif st[0] == 'CALL_P':
-            text += compile_args(st[2])
-            text.append(('CALL', st[1][1]))
-        elif st[0] == 'ASSIGN':
-            for t in compile_expression(st[2]):
+        elif st.typ == 'CALL':
+            text.append(('CALL', st.name))
+        elif st.typ == 'CALL_P':
+            text += compile_args(st.args)
+            text.append(('CALL', st.name))
+        elif st.typ == 'ASSIGN':
+            for t in compile_expression(st.expr):
                 text.append(t)
-            text.append(('STOR', st[1][1]))
-        elif st[0] == 'IF_STAT':
+            text.append(('STOR', st.name))
+        elif st.typ == 'IF_STAT':
             text += compile_if(st)
         else:
             print('Unknown stat:', st)
@@ -190,63 +184,67 @@ def compile_statements(st_seq):
 
 
 def compile_expression(e):
-    if e[0] == 'IDENT':
-        return [('LOAD', e[1])]
-    elif e[0] == 'INTEGER':
-        return [('CONST', e[1])]
-    elif e[0] == 'NOT':
+    if e.typ == 'IDENT':
+        return [('LOAD', e.val)]
+    elif e.typ == 'INTEGER':
+        return [('CONST', e.val)]
+    elif e.typ == 'NOT':
         res = compile_expression(e[1])
         res.append(('NOT',))
         return res
-    elif e[0] == 'FACTOR':
-        return compile_expression(e[1])
-    elif e[0] == 'TERM':
-        ex_list = e[1]
-        if len(ex_list) > 1:
-            res = compile_expression(ex_list[0])
-            res += compile_expression(('TERM', ex_list[2:]))
-            res += [('BINOP', ex_list[1][1])]
+    elif e.typ == 'FACTOR_EXP':
+        return compile_expression(e.expr)
+    elif e.typ == 'FACTOR_INT':
+        return [('CONST', e.val)]
+    elif e.typ == 'FACTOR_IDENT':
+        return [('LOAD', e.name)]
+    elif e.typ == 'TERM':
+        f_list = e.f_list
+        if len(f_list) == 1:  # term = factor
+            res = compile_expression(f_list[0])
             return res
-        else:
-            return compile_expression(ex_list[0])
-    elif e[0] == 'SEXPR':
-        if len(e[1]) == 1:  # SimpleExpression = term
-            return compile_expression(e[1][0])
-        elif len(e[1]) >= 2 and e[1][0][0] in ['PLUS', 'MINUS']:  # SimpleExpression = ["+"|"-"] term
-            res = compile_expression(e[1][1])
-            res.append(("UNARY", e[1][0][1]))
-            for i in range(2, len(e[1]), 2):
-                res += compile_expression(e[1][i+1])
-                res.append(("BINOP", e[1][i][1]))
+        else:  # term = factor {("*" | "DIV" | "MOD" | "&") factor}.
+            res = compile_expression(f_list[0])
+            res += compile_expression(f_list[2])
+            res += [('BINOP', f_list[1].val)]
+            for i in range(3, len(f_list), 2):
+                res += compile_expression(f_list[i + 1])
+                res += [('BINOP', f_list[i].val)]
+            return res
+    elif e.typ == 'SEXPR':
+        if len(e.e_list) == 1:  # SimpleExpression = term
+            return compile_expression(e.e_list[0])
+        elif len(e.e_list) >= 2 and e.e_list[0].typ in ['PLUS', 'MINUS']:  # SimpleExpression = ["+"|"-"] term
+            res = compile_expression(e.e_list[1])
+            res.append(("UNARY", e.e_list[0].val))
+            for i in range(2, len(e.e_list), 2):
+                res += compile_expression(e.e_list[i + 1])
+                res.append(("BINOP", e.e_list[i].val))
             return res
         else:  # # SimpleExpression = term { ("+"|"-"|"OR") term}
-            print(e)
-            res = compile_expression(e[1][0])
-            print(res)
-            res += compile_expression(e[1][2])
-            res.append(("BINOP", e[1][1][1]))
-            for i in range(3, len(e[1]), 2):
-                res += compile_expression(e[1][i + 1])
-                res.append(("BINOP", e[1][i][1]))
+            res = compile_expression(e.e_list[0])
+            res += compile_expression(e.e_list[2])
+            res.append(("BINOP", e.e_list[1].val))
+            for i in range(3, len(e.e_list), 2):
+                res += compile_expression(e.e_list[i + 1])
+                res.append(("BINOP", e.e_list[i].val))
             return res
-    elif e[0] == 'EXPR':
-        ex_list = e[1]
-        if len(ex_list) > 1:
-            res = compile_expression(ex_list[0])
-            res += compile_expression(('EXPR', ex_list[2:]))
-            res.append(('RELOP', ex_list[1][1]))
+    elif e.typ == 'EXPR':  # expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpression].
+        if len(e.expr_list) > 1:
+            res = compile_expression(e.expr_list[0])
+            res += compile_expression(e.expr_list[2])
+            res.append(('RELOP', e.expr_list[1].val))
             return res
         else:
-            return compile_expression(ex_list[0])
-    print("Unknown expr", e)
+            return compile_expression(e.expr_list[0])
+    print("Unknown expr:", e)
     return ""
 
 
 def compile_module(ast):
-    if not (ast[0] == 'MODULE'):
-        return
-    print('MODULE', ast[1])
-    decls = compile_decls(ast[2])
-    text = compile_statements(ast[3])
-    text.append(('STOP', ''))
-    return {'name': ast[1], 'decls': decls, 'text': text}
+    if ast.typ != 'MODULE':
+        raise "Module required"
+    decls = compile_decls(ast.decls)
+    text = compile_statements(ast.st_seq)
+    text.append(('STOP', '12345'))
+    return {'name': ast.name, 'decls': decls, 'text': text}

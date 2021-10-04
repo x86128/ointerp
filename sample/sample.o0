@@ -13,6 +13,6 @@ begin
 end gcd;
 
 begin
-    gcd(27+25*3-(10 div 5),15);
+    gcd(27+25*3-(10 div 5),15)
 
 END Samples.

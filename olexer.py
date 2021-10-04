@@ -16,36 +16,44 @@ class SourceReader:
         return self.c
 
 
+class Token:
+    def __init__(self, typ, val, line=1, pos=1):
+        self.typ = typ
+        self.val = val
+        self.line = line
+        self.pos = pos
+
+
 class TokenStream:
     def __init__(self, source_file):
         self.src = SourceReader(open(source_file, 'r'))
-
         self.line = 1
         self.pos = 0
         self.errors = []
-
         self.token = self.read()
 
     def get_int(self):
         integer = self.src.peek()
+        pos = self.pos
         while c := self.src.read():
             if c.isdecimal():
                 integer += c
             else:
                 break
-        return 'INTEGER', int(integer)
+        return Token('INTEGER', int(integer), self.line, self.pos)
 
     def get_ident(self):
         ident = self.src.peek()
+        pos = self.pos
         while c := self.src.read():
             if c.isalnum():
                 ident += c
             else:
                 break
         if ident.upper() in keywords:
-            return ident.upper(), ident
+            return Token(ident.upper(), ident, self.line, pos)
         else:
-            return "IDENT", ident
+            return Token("IDENT", ident, self.line, pos)
 
     def skip_comment(self):
         tl = self.line
@@ -61,7 +69,6 @@ class TokenStream:
                 return
 
     def read(self):
-        t = ("NULL", "NULL")
         while c := self.src.peek():
             self.pos += 1
             if c == '\n':
@@ -78,75 +85,75 @@ class TokenStream:
                 return self.get_int()
             elif c == ';':
                 self.src.read()
-                return 'SEMICOLON', ';', self.line, self.pos
+                return Token('SEMICOLON', ';', self.line, self.pos)
             elif c == '*':
                 self.src.read()
-                return 'TIMES', '*', self.line, self.pos
+                return Token('TIMES', '*', self.line, self.pos)
             elif c == ',':
                 self.src.read()
-                return 'COMMA', ',', self.line, self.pos
+                return Token('COMMA', ',', self.line, self.pos)
             elif c == ':':
                 self.src.read()
                 if self.src.peek() == '=':
                     self.src.read()
-                    return 'BECOMES', ':=', self.line, self.pos - 1
+                    return Token('BECOMES', ':=', self.line, self.pos - 1)
                 else:
-                    return 'COLON', ':', self.line, self.pos
+                    return Token('COLON', ':', self.line, self.pos)
             elif c == '(':
                 self.src.read()
                 if self.src.peek() == '*':
                     self.skip_comment()
                 else:
-                    return 'LPAREN', '(', self.line, self.pos
+                    return Token('LPAREN', '(', self.line, self.pos)
             elif c == ')':
                 self.src.read()
-                return 'RPAREN', ')', self.line, self.pos
+                return Token('RPAREN', ')', self.line, self.pos)
             elif c == '[':
                 self.src.read()
-                return 'LBRAK', '[', self.line, self.pos
+                return Token('LBRAK', '[', self.line, self.pos)
             elif c == ']':
                 self.src.read()
-                return 'RBRAK', ']', self.line, self.pos
+                return Token('RBRAK', ']', self.line, self.pos)
             elif c == '>':
                 self.src.read()
                 if self.src.peek() == '=':
                     self.src.read()
-                    return 'GEQ', '>=', self.line, self.pos - 1
+                    return Token('GEQ', '>=', self.line, self.pos - 1)
                 else:
-                    return 'GTR', '>', self.line, self.pos
+                    return Token('GTR', '>', self.line, self.pos)
             elif c == '=':
                 self.src.read()
-                return 'EQL', '=', self.line, self.pos
+                return Token('EQL', '=', self.line, self.pos)
             elif c == '#':
                 self.src.read()
-                return 'NEQ', '#', self.line, self.pos
+                return Token('NEQ', '#', self.line, self.pos)
             elif c == '<':
                 self.src.read()
                 if self.src.peek() == '=':
                     self.src.read()
-                    return 'LEQ', '<=', self.line, self.pos - 1
+                    return Token('LEQ', '<=', self.line, self.pos - 1)
                 else:
-                    return 'LSS', '<', self.line, self.pos
+                    return Token('LSS', '<', self.line, self.pos)
             elif c == '+':
                 self.src.read()
-                return 'PLUS', '+', self.line, self.pos
+                return Token('PLUS', '+', self.line, self.pos)
             elif c == '-':
                 self.src.read()
-                return 'MINUS', '-', self.line, self.pos
+                return Token('MINUS', '-', self.line, self.pos)
             elif c == '.':
                 self.src.read()
-                return 'PERIOD', '.', self.line, self.pos
+                return Token('PERIOD', '.', self.line, self.pos)
             elif c == '~':
                 self.src.read()
-                return 'NOT', '~', self.line, self.pos
+                return Token('NOT', '~', self.line, self.pos)
             elif c == '&':
                 self.src.read()
-                return 'AND', '&', self.line, self.pos
+                return Token('AND', '&', self.line, self.pos)
             else:
-                print("Неожиданный символ:", c, "в строке", self.line, ":", self.pos)
-                break
+                msg = f"Неожиданный символ: {c} в строке {self.line}:{self.pos}"
+                raise SyntaxError(msg)
         else:
-            t = ("EOF", "EOF", self.line, self.pos)
+            t = Token("EOF", "EOF", self.line, self.pos)
         return t
 
     def get(self):
@@ -154,32 +161,31 @@ class TokenStream:
         return self.token
 
     def eat(self, tok_type):
-        if self.token[0] == tok_type:
+        if self.token.typ == tok_type:
             t = self.token
             self.token = self.read()
             return t
-        return False
+        return None
 
     def neat(self, *toks):
         for t in toks:
-            if self.token[0] == t:
+            if self.token.typ == t:
                 temp = self.token
                 self.token = self.read()
                 return temp
-        return False
+        return None
 
     def peek(self, what):
-        if self.token[0] == what:
-            return self.token[1]
-        return ""
+        if self.token.typ == what:
+            return self.token
+        return None
 
     def npeek(self, *toks):
         for t in toks:
-            if self.token[0] == t:
+            if self.token.typ == t:
                 return self.token
-        return False
+        return None
 
     def error(self, msg):
-        # print(f"Ошибка в строке:", self.line, msg)
         self.errors.append(f"Ошибка в строке: {self.line}:{self.pos} {msg}")
-        return False
+        return None

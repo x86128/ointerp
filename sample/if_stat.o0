@@ -5,15 +5,50 @@ const
 
 var t1 : integer;
 
+procedure test1;
 begin
-
     t1 := 10;
     if t1 = 10 then
-        writeint(pass)
+        t1 := 9
     elsif t1 < 0 then
-        writeint(fail)
+        halt(fail)
     else
-        writeint(fail)
+        halt(fail)
     end
+end test1;
+
+procedure test2;
+begin
+    if t1 = 10 then
+        halt(fail)
+    elsif t1 < 0 then
+        halt(fail)
+    else
+        t1 := -1
+    end
+end test2;
+
+procedure test3;
+begin
+    if t1 = 10 then
+        halt(fail)
+    elsif t1 < 0 then
+        t1 := pass
+    else
+        halt(fail)
+    end
+end test3;
+
+begin
+    (* initializing test *)
+    t1 := 10;
+
+    (* do modifications of global var t1 *)
+    test1;
+    test2;
+    test3;
+
+    (* t1 must be pass *)
+    halt(t1)
 
 END Samples.
