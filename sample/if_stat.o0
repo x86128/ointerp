@@ -7,7 +7,6 @@ var t1 : integer;
 
 procedure test1;
 begin
-    t1 := 10;
     if t1 = 10 then
         t1 := 9
     elsif t1 < 0 then

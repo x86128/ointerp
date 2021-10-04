@@ -1,0 +1,21 @@
+MODULE Samples;
+
+const
+    pass = 12345;
+    fail = 54321;
+
+var t : integer;
+
+begin
+    t := 10;
+    while t < 20 do
+        t := t + 1
+    end;
+
+    if t # 20 then
+        halt(fail)
+    end;
+
+    halt(pass)
+
+END Samples.

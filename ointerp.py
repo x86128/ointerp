@@ -5,7 +5,7 @@ from ocompiler import compile_module
 from ovm import run_code
 
 if __name__ == "__main__":
-    source = TokenStream('sample/if_stat.o0')
+    source = TokenStream('sample/while.o0')
     syn_tree = parse_module(source)
     if source.errors:
         print(source.errors[0])
