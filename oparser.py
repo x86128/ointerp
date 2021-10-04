@@ -198,7 +198,7 @@ def p_repeat_stat(src):
         return src.error("Ожидается UNTIL")
     if not (ex := p_expression(src)):
         return src.error("Требуется условие UNTIL")
-    return 'REPEAT', st, ex
+    return ASTNode('REPEAT', expr=ex, st_seq=st)
 
 
 # statement = [assignment | ProcedureCall | IfStatement | WhileStatement | RepeatStatement].

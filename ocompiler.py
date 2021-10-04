@@ -118,6 +118,15 @@ def compile_while(st):
     text.append(('LABEL', f'L{label + 1}'))
     return text
 
+def compile_repeat(st):
+    global label_counter
+    label = label_counter
+    label_counter += 1
+    text = [('LABEL', f'L{label}')]
+    text += compile_statements(st.st_seq)
+    text += compile_expression(st.expr)
+    text.append(('BR_ZERO', f'L{label}'))
+    return text
 
 def compile_if(st):
     global label_counter
@@ -167,6 +176,8 @@ def compile_statements(st_seq):
     for i, st in enumerate(st_seq.st_seq):
         if st.typ == 'WHILE':
             text += compile_while(st)
+        elif st.typ == 'REPEAT':
+            text += compile_repeat(st)
         elif st.typ == 'CALL':
             text.append(('CALL', st.name))
         elif st.typ == 'CALL_P':
