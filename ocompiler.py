@@ -199,16 +199,16 @@ def compile_expression(e):
         return [('LOAD', e.val)]
     elif e.typ == 'INTEGER':
         return [('CONST', e.val)]
-    elif e.typ == 'NOT':
-        res = compile_expression(e[1])
-        res.append(('NOT',))
-        return res
     elif e.typ == 'FACTOR_EXP':
         return compile_expression(e.expr)
     elif e.typ == 'FACTOR_INT':
         return [('CONST', e.val)]
     elif e.typ == 'FACTOR_IDENT':
         return [('LOAD', e.name)]
+    elif e.typ == 'FACTOR_NOT':
+        res = compile_expression(e.factor)
+        res.append(('UNARY', '~'))
+        return res
     elif e.typ == 'TERM':
         f_list = e.f_list
         if len(f_list) == 1:  # term = factor
@@ -248,7 +248,7 @@ def compile_expression(e):
             return res
         else:
             return compile_expression(e.expr_list[0])
-    print("Unknown expr:", e)
+    raise RuntimeError(f"Unknown expr: {e}")
     return ""
 
 

@@ -40,7 +40,7 @@ class TokenStream:
                 integer += c
             else:
                 break
-        return Token('INTEGER', int(integer), self.line, self.pos)
+        return Token('INTEGER', int(integer), self.line, pos)
 
     def get_ident(self):
         ident = self.src.peek()
@@ -51,7 +51,7 @@ class TokenStream:
             else:
                 break
         if ident.upper() in keywords:
-            return Token(ident.upper(), ident, self.line, pos)
+            return Token(ident.upper(), ident.upper(), self.line, pos)
         else:
             return Token("IDENT", ident, self.line, pos)
 

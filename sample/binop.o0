@@ -1,0 +1,81 @@
+MODULE binop;
+const
+    pass = 12345;
+    fail = 54321;
+
+var
+    a,b : integer;
+
+begin
+
+    a := 0;
+    b := 1;
+
+    if a + b # 1 then
+        halt(fail)
+    end;
+
+    if a - b # -1 then
+        halt(fail)
+    end;
+
+    if a & b # 0 then
+        halt(fail)
+    end;
+
+    if a or b # 1 then
+        halt(fail)
+    end;
+
+    if a * b # 0 then
+        halt(fail)
+    end;
+
+    if a div b # 0 then
+        halt(fail)
+    end;
+
+    if b < a then
+        halt(fail)
+    end;
+
+    if b <= a then
+        halt(fail)
+    end;
+
+    if a > b then
+        halt(fail)
+    end;
+
+    if a >= b then
+        halt(fail)
+    end;
+
+    if a = b then
+        halt(fail)
+    end;
+
+    a := b;
+    if a # b then
+        halt(fail)
+    end;
+
+    a := 0;
+    b := ~a;
+
+    if a < b then
+        halt(fail)
+    end;
+
+    b := -a;
+    if a < b then
+        halt(fail)
+    end;
+
+    b := +a;
+    if a < b then
+        halt(fail)
+    end;
+
+    halt(pass)
+end binop.

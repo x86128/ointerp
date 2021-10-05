@@ -49,9 +49,10 @@ def exec_text(frame_stack, const_stack, data_stack, module):
                 data_stack.append(-data_stack.pop())
             elif cmd[1] == '+':
                 pass
+            elif cmd[1] == '~':
+                data_stack.append(~data_stack.pop())
             else:
-                print('Unknown unary OP', cmd[1])
-                break
+                raise RuntimeError(f'Unknown unary OP {cmd[1]}')
         elif op == 'BINOP':
             if cmd[1] == '+':
                 t = data_stack.pop()
@@ -61,17 +62,25 @@ def exec_text(frame_stack, const_stack, data_stack, module):
                 t = data_stack.pop()
                 t = data_stack.pop() * t
                 data_stack.append(t)
-            elif cmd[1] == 'mod':
+            elif cmd[1] == 'MOD':
                 t = data_stack.pop()
                 t = data_stack.pop() % t
                 data_stack.append(t)
-            elif cmd[1] == 'div':
+            elif cmd[1] == 'DIV':
                 t = data_stack.pop()
                 t = int(data_stack.pop() / t)
                 data_stack.append(t)
             elif cmd[1] == '-':
                 t = data_stack.pop()
                 t = data_stack.pop() - t
+                data_stack.append(t)
+            elif cmd[1] == 'OR':
+                t = data_stack.pop()
+                t = data_stack.pop() or t
+                data_stack.append(t)
+            elif cmd[1] == '&':
+                t = data_stack.pop()
+                t = data_stack.pop() and t
                 data_stack.append(t)
             else:
                 print('Unknown BINOP', cmd)
@@ -117,9 +126,21 @@ def exec_text(frame_stack, const_stack, data_stack, module):
                     data_stack.append(1)
                 else:
                     data_stack.append(0)
+            elif cmd[1] == '>=':
+                t = data_stack.pop()
+                if data_stack.pop() >= t:
+                    data_stack.append(1)
+                else:
+                    data_stack.append(0)
             elif cmd[1] == '<':
                 t = data_stack.pop()
                 if data_stack.pop() < t:
+                    data_stack.append(1)
+                else:
+                    data_stack.append(0)
+            elif cmd[1] == '<=':
+                t = data_stack.pop()
+                if data_stack.pop() <= t:
                     data_stack.append(1)
                 else:
                     data_stack.append(0)
