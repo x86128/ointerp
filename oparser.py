@@ -16,7 +16,7 @@ class ASTNode:
 
 def p_ident(src):
     if ident := src.eat('IDENT'):
-        return ASTNode('IDENT', name=ident.val)
+        return ASTNode('IDENT', name=ident.val, line=ident.line)
     return None
 
 
@@ -246,15 +246,16 @@ def p_stat_seq(src):
 def p_ident_list(src):
     id_list = []
     if ident := p_ident(src):
+        line = ident.line
         id_list.append(ident.name)
         while src.eat('COMMA'):
             if ident := p_ident(src):
                 id_list.append(ident.name)
             else:
                 return src.error("Ожидается список идентификаторов")
+        return ASTNode('ID_LIST', id_list=id_list, line=line)
     else:
         return None
-    return ASTNode('ID_LIST', id_list=id_list)
 
 
 # ArrayType = "ARRAY" expression "OF" type.
@@ -265,7 +266,7 @@ def p_array_type(src):
         if not src.eat('OF'):
             return src.error("Ожидается OF")
         if t := p_type(src):
-            return 'ARRAY_TYPE', e, t
+            return ASTNode('ARRAY_TYPE', expr=e, type=t.type)
         else:
             return None
     return None
@@ -305,7 +306,7 @@ def p_type(src):
     if ident := src.eat('IDENT'):
         return ASTNode('TYPE', type=ident.val)
     elif at := p_array_type(src):
-        return ASTNode('TYPE_ARRAY', at=at)
+        return at
     elif rt := p_record_type(src):
         return ASTNode('TYPE_RECORD', rt=rt)
     return None
@@ -395,7 +396,7 @@ def p_declarations(src):
             if not src.eat('EQL'):
                 return src.error('Ожидается =')
             if c_exp := p_expression(src):
-                c_list.append(ASTNode('CONST', name=c_name.val, expr=c_exp))
+                c_list.append(ASTNode('CONST', name=c_name.val, expr=c_exp, line=c_name.line))
             else:
                 return src.error('Ожидается выражение')
             if not src.eat('SEMICOLON'):
@@ -406,7 +407,7 @@ def p_declarations(src):
                 return src.error('Ожидается :')
             if id_type := p_type(src):
                 for v_id in id_list.id_list:
-                    v_list.append(ASTNode('VAR', name=v_id, type=id_type))
+                    v_list.append(ASTNode('VAR', name=v_id, type=id_type, line=id_list.line))
             else:
                 return src.error('Ожидается тип')
             if not src.eat('SEMICOLON'):

@@ -1,0 +1,14 @@
+MODULE arrays;
+const
+    pass = 12345;
+    fail = 54321;
+
+    N = 5;
+
+var
+    a : array N+1 of integer;
+    b : integer;
+
+begin
+    halt(pass)
+end arrays.

@@ -27,6 +27,7 @@ system_procs = {'writeint': writeint, 'halt': halt}
 
 
 def exec_text(frame_stack, const_stack, data_stack, module):
+    global c_mem
     pc = 0
     text = module['text']
     # fill labels with addresses
@@ -114,7 +115,7 @@ def exec_text(frame_stack, const_stack, data_stack, module):
             if not found:
                 for env in const_stack[::-1]:
                     if cmd[1] in env:
-                        data_stack.append(env[cmd[1]])
+                        data_stack.append(c_mem[env[cmd[1]]['ind']])
                         found = True
             if not found:
                 print(f'Variable or constant: {cmd[1]} undefined')
@@ -171,5 +172,10 @@ def exec_text(frame_stack, const_stack, data_stack, module):
         pc = pc_next
 
 
+c_mem = []
+
+
 def run_code(module):
+    global c_mem
+    c_mem = module['c_mem']
     exec_text([module['decls']['vars']], [module['decls']['consts']], [], module)

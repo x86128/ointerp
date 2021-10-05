@@ -1,6 +1,8 @@
 import pprint
 import sys
 
+from dataclasses import dataclass
+
 
 def compile_procs(procs):
     res = {}
@@ -15,7 +17,7 @@ def compile_procs(procs):
         for args in proc.head.fp.fp_list:
             for arg in args.id_list.id_list:
                 if arg in decls["vars"]:
-                    print("Имя аргумента не может совпадать с именем переменной", a[0])
+                    print("Имя аргумента не может совпадать с именем переменной", arg)
                     sys.exit(1)
                 else:
                     decls["vars"][arg] = (0, args.type.type)
@@ -30,33 +32,40 @@ def compile_procs(procs):
     return res
 
 
-def eval_static_const_expr(consts, text):
+def eval_static_const_expr(text):
+    global c_tbl, c_mem
     stack = []
     for instr in text:
         if instr[0] == 'CONST':
             stack.append(instr[1])
         elif instr[0] == 'LOAD':
-            if instr[1] in consts:
-                stack.append(consts[instr[1]])
-            else:
-                print('Undefined const', instr[1])
-                sys.exit(1)
+            for scope in c_tbl[::-1]:
+                if instr[1] in scope:
+                    c_ind = scope[instr[1]]['ind']
+                    stack.append(c_mem[c_ind])
+                else:
+                    print('Undefined const', instr[1])
+                    sys.exit(1)
         elif instr[0] == 'BINOP':
             if instr[1] == '+':
                 stack.append(stack.pop() + stack.pop())
-            if instr[1] == '-':
+            elif instr[1] == 'OR':
+                stack.append(stack.pop() or stack.pop())
+            elif instr[1] == '&':
+                stack.append(stack.pop() and stack.pop())
+            elif instr[1] == '-':
                 t = stack.pop()
                 stack.append(stack.pop() - t)
-            if instr[1] == '*':
+            elif instr[1] == '*':
                 stack.append(stack.pop() * stack.pop())
-            if instr[1] == 'div':
+            elif instr[1] == 'DIV':
                 t = stack.pop()
                 stack.append(int(stack.pop() / t))
-            elif instr[1] == 'mod':
+            elif instr[1] == 'MOD':
                 t = stack.pop()
                 stack.append(stack.pop() % t)
             else:
-                print('Unknown instruction in const expr', instr)
+                raise RuntimeError(f'Unknown instruction in const expr {instr}')
         elif instr[0] == 'UNARY':
             if instr[1] == '+':
                 pass
@@ -69,37 +78,80 @@ def eval_static_const_expr(consts, text):
     return stack.pop()
 
 
+# define global constant and variable tables for scope tracking
+c_tbl = []
+v_tbl = []
+
+# constant memory
+c_mem = []
+
+
 def compile_consts(consts):
+    global c_tbl, c_mem
     res = {}
     if not consts:
         return res
     for const in consts:
         if const.name in res:
-            print("Переопределение константы", const.name)
+            print(f"Переопределение константы `{const.name}` в строке {const.line}")
             sys.exit(1)
-        else:
-            t = compile_expression(const.expr)
-            res[const.name] = eval_static_const_expr(res, t)
+        for scope in c_tbl[::-1]:
+            if const.name in scope:
+                print(f"Переопределение константы `{const.name}` в строке {const.line} вышестоящей области видимости")
+                break
+        t = compile_expression(const.expr)
+        c_val = eval_static_const_expr(t)
+
+        c_ind = len(c_mem)
+        c_mem.append(c_val)
+        res[const.name] = {'ind': c_ind, 'line': const.line}
+        c_tbl[-1][const.name] = res[const.name]
     return res
 
 
 def compile_vars(variables):
+    global c_tbl, v_tbl
     res = {}
     if not variables:
         return res
     for v in variables:
+        # если переменная с данным именем уже определена в текущей области видимости - падаем
         if v.name in res:
-            print("Переопределение переменной", v.name)
+            print(f"ERR: Переопределение переменной `{v.name}` в строке {v.line}")
             sys.exit(1)
-        else:
+        # ищем переменную в вышестоящих областях видимости начиная с самой внутренней
+        for scope in v_tbl[::-1]:
+            if v.name in scope:
+                print(f"WARN: Переопределение переменной `{v.name}` в строке {v.line} из внешней области видимости")
+                break
+        if v.type.typ == 'TYPE':  # scalar type
             res[v.name] = (0, v.type.type)  # (default value, type)
+        elif v.type.typ == 'ARRAY_TYPE':
+            e_const = compile_expression(v.type.expr)
+            try:
+                e_val = eval_static_const_expr(e_const)
+            except ValueError:
+                raise SyntaxError(f"Array size must be scalar or const")
+            res[v.name] = ([0] * e_val, v.type.type)  # (default value, type)
+            v_tbl[-1][v.name] = True
+        else:
+            raise SyntaxError(f"Unknown type: {v.type.typ}")
     return res
 
 
 def compile_decls(decls):
+    global c_tbl, v_tbl
+    # перед компиляцией констант и переменных создаем область видимости
+    # в соответствующих глобальных таблицах
+    c_tbl.append({})
+    v_tbl.append({})
+    # компилируем
     consts = compile_consts(decls.c_list)
     variables = compile_vars(decls.v_list)
     procs = compile_procs(decls.p_list)
+    # чистим таблицы видимости
+    c_tbl.pop()
+    v_tbl.pop()
     return {"consts": consts, "vars": variables, "procs": procs}
 
 
@@ -118,6 +170,7 @@ def compile_while(st):
     text.append(('LABEL', f'L{label + 1}'))
     return text
 
+
 def compile_repeat(st):
     global label_counter
     label = label_counter
@@ -127,6 +180,7 @@ def compile_repeat(st):
     text += compile_expression(st.expr)
     text.append(('BR_ZERO', f'L{label}'))
     return text
+
 
 def compile_if(st):
     global label_counter
@@ -249,13 +303,13 @@ def compile_expression(e):
         else:
             return compile_expression(e.expr_list[0])
     raise RuntimeError(f"Unknown expr: {e}")
-    return ""
 
 
 def compile_module(ast):
+    global c_mem
     if ast.typ != 'MODULE':
         raise "Module required"
     decls = compile_decls(ast.decls)
     text = compile_statements(ast.st_seq)
     text.append(('STOP', '12345'))
-    return {'name': ast.name, 'decls': decls, 'text': text}
+    return {'name': ast.name, 'decls': decls, 'text': text, 'c_mem': c_mem}
