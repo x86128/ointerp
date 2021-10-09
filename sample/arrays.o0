@@ -9,6 +9,17 @@ var
     a : array N+1 of integer;
     b : integer;
 
+procedure test(i,j : integer);
+var
+    k,l,m : integer;
+
 begin
+    b := i
+
+end test;
+
+begin
+    test(0,1);
     halt(pass)
+
 end arrays.
