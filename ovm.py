@@ -31,8 +31,8 @@ def halt():
 system_procs = {'writeint': writeint, 'halt': halt}
 
 
-def exec_text(start_pc, env):
-    global c_mem, d_mem, sp, bp, p_text, proc_tab
+def exec_text(start_pc):
+    global c_mem, d_mem, sp, bp, p_text, proc_tab, trace_enabled
     pc = start_pc
     op_counter = 0
     # fill labels with addresses
@@ -48,7 +48,7 @@ def exec_text(start_pc, env):
         if op == 'STOP':
             print(f'STOP at {pc}')
             break
-        elif op_counter > 1000:
+        elif op_counter > 200:
             print("Executed more then", op_counter, "instructions")
             break
         elif op == 'CONST':
@@ -113,20 +113,17 @@ def exec_text(start_pc, env):
                 pc_next = proc['offset']
             else:
                 raise RuntimeError(f'Undefined procedure {cmd[1]}')
-        elif op == 'STOR':
-            found = False
-            scope = env[-1]['vars']
-            if cmd[1] in scope:
-                sp -= 1
-                d_mem[bp + scope[cmd[1]]['offset']] = d_mem[sp]
-                found = True
-            if not found:
-                raise RuntimeError(f'Variable {cmd[1]} undefined')
+        elif op == 'VSTOR':
+            sp -= 1
+            d_mem[bp + cmd[1] + 1] = d_mem[sp]
+        elif op == 'ASTOR':
+            sp -= 1
+            d_mem[bp - cmd[1]] = d_mem[sp]
         elif op == 'ALOAD':
             d_mem[sp] = d_mem[bp - cmd[1]]
             sp += 1
-        elif op == 'LOAD':
-            d_mem[sp] = d_mem[bp + cmd[1]]
+        elif op == 'VLOAD':
+            d_mem[sp] = d_mem[bp + cmd[1] + 1]
             sp += 1
         elif op == 'CLOAD':
             d_mem[sp] = c_mem[cmd[1]]
@@ -144,21 +141,24 @@ def exec_text(start_pc, env):
             pass
         else:
             raise RuntimeError(f'Unknown opcode: {cmd}')
+        if trace_enabled:
+            print(f'OP={cmd} PC={pc} BP={bp} SP={sp} D_MEM={d_mem[:10]}')
         pc = pc_next
+        op_counter += 1
 
 
 c_mem = []
 proc_tab = {}
 p_text = []
-env = []
 bp = 0
 d_mem = [0] * 65536
 sp = 0
+trace_enabled = False
 
+def run_code(module, trace=False):
+    global c_mem, proc_tab, p_text, d_mem, bp, sp, trace_enabled
 
-def run_code(module):
-    global c_mem, proc_tab, p_text, env, d_mem, bp, sp
-
+    trace_enabled = trace
     c_mem = module['c_mem']
     proc_tab = module['proc_tab']
     p_text = module['p_text']
@@ -166,8 +166,7 @@ def run_code(module):
     main_proc = module['main']
 
     start_pc = proc_tab[main_proc]['offset']
-    env.append({'consts': module['consts'], 'vars': module['vars']})
-    sp = module['v_size']  # выделяем место для локальных переменных модуля
-    bp = sp - 1
+    # sp = module['v_size']  # выделяем место для локальных переменных модуля
+    bp = sp = 0
 
-    exec_text(start_pc, env)
+    exec_text(start_pc)

@@ -213,7 +213,7 @@ def p_statement(src):
         elif src.eat('BECOMES'):
             if not (ex := p_expression(src)):
                 return src.error('Ожидается правая часть выражения')
-            return ASTNode('ASSIGN', name=ident.val, expr=ex)
+            return ASTNode('ASSIGN', name=ident.val, expr=ex, line=ident.line)
         if ap := p_actual_parameters(src):
             return ASTNode('CALL_P', name=ident.val, args=ap)
         else:

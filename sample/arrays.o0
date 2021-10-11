@@ -14,12 +14,13 @@ var
     k,l,m : integer;
 
 begin
-    b := i
+    k := i
 
 end test;
 
 begin
     test(0,1);
+    writeint(pass);
     halt(pass)
 
 end arrays.

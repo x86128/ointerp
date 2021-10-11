@@ -266,7 +266,13 @@ def compile_statements(env, st_seq):
         elif st.typ == 'ASSIGN':
             for t in compile_expression(env, st.expr):
                 text.append(t)
-            text.append(('STOR', st.name))
+            # text.append(('STOR', st.name))
+            if st.name in env[-1]['vars']:
+                text.append(('VSTOR', env[-1]['vars'][st.name]['offset'], st.name))
+            elif st.name in env[-1]['args']:
+                text.append(('ASTOR', env[-1]['args'][st.name]['offset'], st.name))
+            else:
+                raise SystemError(f'Ошибка в строке {st.line}: Присваивание позволено только локальным переменным')
         elif st.typ == 'IF_STAT':
             text += compile_if(env, st)
         else:
@@ -287,7 +293,7 @@ def compile_expression(env, e):
         # ищем в переменных
         scope = env[-1]
         if e.name in scope['vars']:
-            return [('VLOAD', scope['vars'][e.name]['offset'], e.namee.name)]
+            return [('VLOAD', scope['vars'][e.name]['offset'], e.name)]
         elif e.name in scope['consts']:
             return [('CLOAD', scope['consts'][e.name]['offset'], e.name)]
         elif e.name in scope['args']:
