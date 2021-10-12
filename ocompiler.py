@@ -237,6 +237,7 @@ def compile_args(env, ap, proc_name):
         arg_list = ['']*len(ap.arg_list)
         for arg in proc_tab[proc_name]['args']:
             arg_list[proc_tab[proc_name]['args'][arg]['offset']] = arg
+        arg_list = arg_list[::-1]
         for i, arg in enumerate(ap.arg_list):
             if proc_tab[proc_name]['args'][arg_list[i]]['var']:
                 t = compile_expression(env, arg)
