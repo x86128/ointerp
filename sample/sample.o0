@@ -1,4 +1,7 @@
 MODULE Samples;
+const
+    pass = 12345;
+    fail = 54321;
 
 var
     t : integer;
@@ -14,5 +17,10 @@ end gcd;
 
 begin
     gcd(27+25*3-(10 div 5),15, t);
-    writeint(t)
+    if t = 5 then
+        halt(pass)
+    else
+        halt(fail)
+    end
+
 END Samples.
