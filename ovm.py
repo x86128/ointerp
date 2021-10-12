@@ -46,7 +46,7 @@ def exec_text(start_pc):
         if op == 'STOP':
             print(f'STOP at {pc}')
             break
-        elif op_counter > 50:
+        elif op_counter > 100:
             print("Executed more then", op_counter, "instructions")
             break
         elif op == 'CONST':

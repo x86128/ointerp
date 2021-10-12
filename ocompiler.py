@@ -288,7 +288,10 @@ def compile_statements(env, st_seq):
                 text.append(('VSTOR', v_offset, st.name))
             elif st.name in env[-1]['args']:
                 v_offset -= (1 + env[-1]['args'][st.name]['offset'])
-                text.append(('RSTOR', v_offset, st.name))
+                if env[-1]['args'][st.name]['var']:
+                    text.append(('RSTOR', v_offset, st.name))
+                else:
+                    text.append(('VSTOR', v_offset, st.name))
             else:
                 raise SystemError(f'Ошибка в строке {st.line}: Присваивание позволено только локальным переменным')
         elif st.typ == 'IF_STAT':
@@ -317,7 +320,10 @@ def compile_expression(env, e):
             return [('CLOAD', scope['consts'][e.name]['offset'], e.name)]
         elif e.name in scope['args']:
             v_offset -= (1 + scope['args'][e.name]['offset'])
-            return [('RLOAD', v_offset, e.name)]
+            if scope['args'][e.name]['var']:
+                return [('RLOAD', v_offset, e.name)]
+            else:
+                return [('VLOAD', v_offset, e.name)]
         return [('GLOAD', e.name)]
     elif e.typ == 'FACTOR_NOT':
         res = compile_expression(env, e.factor)
