@@ -16,12 +16,13 @@ def compile_procs(env, procs):
         arg_list = {}
         arg_offset = 0
         for args in proc.head.fp.fp_list[::-1]:
+            is_var = args.typ == 'FP_VAR'
             for arg in args.id_list.id_list[::-1]:
                 if arg in env[-1]["vars"]:
                     print("Имя аргумента не может совпадать с именем переменной", arg)
                     sys.exit(1)
                 else:
-                    arg_list[arg] = {'offset': arg_offset, 'typ': args.type.type}
+                    arg_list[arg] = {'offset': arg_offset, 'typ': args.type.type, 'var': is_var}
                     arg_offset += 1
         w_offset = 0
         w_env = {}
@@ -226,10 +227,22 @@ def compile_if(env, st):
     return text
 
 
-def compile_args(env, ap):
+def compile_args(env, ap, proc_name):
+    global proc_tab
     text = []
-    for i, arg in enumerate(ap.arg_list):
-        text += compile_expression(env, arg)
+    if proc_name in system_procs:
+        for i, arg in enumerate(ap.arg_list):
+            text += compile_expression(env, arg)
+    else:
+        arg_list = ['']*len(ap.arg_list)
+        for arg in proc_tab[proc_name]['args']:
+            arg_list[proc_tab[proc_name]['args'][arg]['offset']] = arg
+        for i, arg in enumerate(ap.arg_list):
+            if proc_tab[proc_name]['args'][arg_list[i]]['var']:
+                t = compile_expression(env, arg)
+                text.append(('ADR_LOAD', t[-1][1], t[-1][2]))
+            else:
+                text += compile_expression(env, arg)
     return text
 
 
@@ -250,27 +263,32 @@ def compile_statements(env, st_seq):
             else:
                 text.append(('CALL', st.name))
         elif st.typ == 'CALL_P':
+            text += compile_args(env, st.args, st.name)
             if st.name in system_procs:
-                c_alloc = system_procs[st.name]['v_size']
+                v_sz = system_procs[st.name]['v_size']
+                arg_sz = system_procs[st.name]['arg_sz']
             else:
-                c_alloc = proc_tab[st.name]['v_size']
-            text += compile_args(env, st.args)
-            if c_alloc > 0:
-                text.append(('ALLOC', c_alloc))
+                v_sz = proc_tab[st.name]['v_size']
+                arg_sz = proc_tab[st.name]['arg_sz']
+                p_ptr = proc_tab[st.name]['offset']
+            if v_sz > 0:
+                text.append(('ALLOC', v_sz))
             if st.name in system_procs:
                 text.append(('SYSCALL', st.name))
             else:
-                text.append(('CALL', st.name))
-            if c_alloc > 0:
-                text.append(('DEALLOC', c_alloc))
+                text.append(('CALL', p_ptr, st.name))
+            if v_sz + arg_sz > 0:
+                text.append(('DEALLOC', v_sz + arg_sz))
         elif st.typ == 'ASSIGN':
             for t in compile_expression(env, st.expr):
                 text.append(t)
-            # text.append(('STOR', st.name))
+            v_offset = -len(env[-1]['vars'])
             if st.name in env[-1]['vars']:
-                text.append(('VSTOR', env[-1]['vars'][st.name]['offset'], st.name))
+                v_offset += env[-1]['vars'][st.name]['offset']
+                text.append(('VSTOR', v_offset, st.name))
             elif st.name in env[-1]['args']:
-                text.append(('ASTOR', env[-1]['args'][st.name]['offset'], st.name))
+                v_offset -= (1 + env[-1]['args'][st.name]['offset'])
+                text.append(('RSTOR', v_offset, st.name))
             else:
                 raise SystemError(f'Ошибка в строке {st.line}: Присваивание позволено только локальным переменным')
         elif st.typ == 'IF_STAT':
@@ -292,12 +310,14 @@ def compile_expression(env, e):
     elif e.typ == 'FACTOR_IDENT':
         # ищем в переменных
         scope = env[-1]
+        v_offset = -len(scope['vars'])
         if e.name in scope['vars']:
-            return [('VLOAD', scope['vars'][e.name]['offset'], e.name)]
+            return [('VLOAD', v_offset + scope['vars'][e.name]['offset'], e.name)]
         elif e.name in scope['consts']:
             return [('CLOAD', scope['consts'][e.name]['offset'], e.name)]
         elif e.name in scope['args']:
-            return [('ALOAD', scope['args'][e.name]['offset'], e.name)]
+            v_offset -= (1 + scope['args'][e.name]['offset'])
+            return [('RLOAD', v_offset, e.name)]
         return [('GLOAD', e.name)]
     elif e.typ == 'FACTOR_NOT':
         res = compile_expression(env, e.factor)

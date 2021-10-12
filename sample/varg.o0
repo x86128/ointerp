@@ -1,0 +1,36 @@
+module varg;
+
+var
+    a,b : integer;
+
+procedure swap0(x,y : integer);
+var
+    t : integer;
+begin
+    t := y;
+    y := x;
+    x := t
+end swap0;
+
+procedure swap1(var x,y : integer);
+var
+    t : integer;
+begin
+    t := y;
+    y := x;
+    x := t
+end swap1;
+
+begin
+    a := 1;
+    b := 2;
+
+    swap0(a,b);
+    writeint(a);
+    writeint(b);
+
+    swap1(a,b);
+    writeint(a);
+    writeint(b)
+
+end varg.
