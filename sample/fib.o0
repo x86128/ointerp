@@ -1,0 +1,23 @@
+module fib;
+
+var t : integer;
+
+procedure fib(n : integer; var res : integer);
+var t1, t2 : integer;
+begin
+    if n < 2 then
+        res := 1
+    else
+        fib(n - 1, t1);
+        fib(n - 2, t2);
+        res := t1 + t2
+    end
+end fib;
+
+begin
+    t := 0;
+    fib(7, t);
+    writeint(t);
+    writeln
+
+end fib.

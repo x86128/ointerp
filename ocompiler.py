@@ -201,6 +201,8 @@ def compile_if(env, st):
     text += compile_expression(env, st.expr)
     if len(st.elsif_block) > 0:
         text.append(('BR_ZERO', f'L{elsif_label}'))
+    elif len(st.else_block) > 0:
+        text.append(('BR_ZERO', f'L{else_label}'))
     else:
         text.append(('BR_ZERO', f'L{exit_label}'))
     text += compile_statements(env, st.then_block)
