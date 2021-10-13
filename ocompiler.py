@@ -161,7 +161,10 @@ def compile_decls(env, decls):
 
 
 label_counter = 0
+label_tab = {}
 
+def set_label(l_name):
+    global label_tab
 
 def compile_while(env, st):
     global label_counter

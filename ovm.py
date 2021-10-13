@@ -165,6 +165,7 @@ def exec_text(start_pc):
 
 
 c_mem = []
+c_tab = {}
 proc_tab = {}
 p_text = []
 bp = -99
