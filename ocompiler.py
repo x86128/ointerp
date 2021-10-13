@@ -1,7 +1,10 @@
 import pprint
 import sys
 
-system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1}, 'halt': {'v_size': 0, 'arg_sz': 1}}
+system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1},
+                'writespace': {'v_size': 0, 'arg_sz': 1},
+                'writeln': {'v_size': 0, 'arg_sz': 0},
+                'halt': {'v_size': 0, 'arg_sz': 1}}
 
 
 def compile_procs(env, procs):
@@ -35,15 +38,15 @@ def compile_procs(env, procs):
         env[-1]['proc'] = proc.name
         env[-1]['proc_ptr'] = proc_ptr
         env[-1]['args'] = arg_list
+        proc_tab[proc.name] = {'offset': proc_ptr, "args": arg_list, 'arg_sz': len(arg_list),
+                               'consts': env[-1]['consts'],
+                               'vars': w_env,
+                               'v_size': w_offset}
 
         text += compile_statements(env, proc.body.st_seq)
         text.append(('RETURN', ''))
 
         program_mem += text
-        proc_tab[proc.name] = {'offset': proc_ptr, "args": arg_list, 'arg_sz': len(arg_list),
-                               'consts': env[-1]['consts'],
-                               'vars': w_env,
-                               'v_size': w_offset}
         proc_ptr += len(text)
         env.pop()
 

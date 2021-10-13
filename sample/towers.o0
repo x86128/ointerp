@@ -1,0 +1,28 @@
+module towers;
+
+var
+    n : integer;
+
+procedure write2ln(x, y: integer);
+begin
+    writeint(x);
+    writespace(1);
+    writeint(y);
+    writeln
+end write2ln;
+
+procedure hanoy(n, x, y, z: integer);
+begin
+    if n > 0 then
+        hanoy(n-1, x, z, y);
+        write2ln(x, y);
+        hanoy(n-1, z, y, x)
+    end
+
+end hanoy;
+
+begin
+    n := 3;
+    hanoy(n, 1, 2, 3)
+
+end towers.

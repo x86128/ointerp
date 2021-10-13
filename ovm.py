@@ -5,7 +5,16 @@ import sys
 # system internal procedures
 def writeint():
     global d_mem, sp
-    print(d_mem[sp-1])
+    print(d_mem[sp - 1], end='')
+
+
+def writeln():
+    print()
+
+
+def writespace():
+    global d_mem, sp
+    print(' ' * d_mem[sp - 1], end='')
 
 
 # halt magic numbers
@@ -26,7 +35,10 @@ def halt():
     sys.exit(code)
 
 
-system_procs = {'writeint': writeint, 'halt': halt}
+system_procs = {'writeint': writeint,
+                'writeln': writeln,
+                'writespace': writespace,
+                'halt': halt}
 
 
 def exec_text(start_pc):
@@ -46,7 +58,7 @@ def exec_text(start_pc):
         if op == 'STOP':
             print(f'STOP at {pc}')
             break
-        elif op_counter > 100:
+        elif op_counter > 1000:
             print("Executed more then", op_counter, "instructions")
             break
         elif op == 'CONST':
@@ -102,7 +114,7 @@ def exec_text(start_pc):
                 raise RuntimeError(f'Undefined system procedure {cmd[1]}')
         elif op == 'CALL':
             d_mem[sp] = bp
-            d_mem[sp+1] = pc + 1
+            d_mem[sp + 1] = pc + 1
             bp = sp
             sp += 2
             # proc = proc_tab[cmd[1]]
