@@ -254,10 +254,20 @@ def compile_statements(env, st_seq):
             text += compile_repeat(env, st)
         elif st.typ == 'CALL':
             if st.name in system_procs:
+                if system_procs[st.name]['arg_sz'] > 0:
+                    raise SyntaxError(f'В процедуру {st.name} не переданы параметры')
                 text.append(('SYSCALL', st.name))
             else:
+                if proc_tab[st.name]['arg_sz'] > 0:
+                    raise SyntaxError(f'В процедуру {st.name} не переданы параметры')
                 text.append(('CALL', st.name))
         elif st.typ == 'CALL_P':
+            if st.name in system_procs:
+                if len(st.args.arg_list) != system_procs[st.name]['arg_sz']:
+                    raise SyntaxError(f'Процедура {st.name} ожидает {system_procs[st.name]["arg_sz"]} параметров')
+            elif st.name in proc_tab:
+                if len(st.args.arg_list) != proc_tab[st.name]['arg_sz']:
+                    raise SyntaxError(f'Процедура {st.name} ожидает {proc_tab[st.name]["arg_sz"]} параметров')
             text += compile_args(env, st.args, st.name)
             if st.name in system_procs:
                 v_sz = system_procs[st.name]['v_size']
