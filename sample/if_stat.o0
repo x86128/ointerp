@@ -5,7 +5,7 @@ const
 
 var t1 : integer;
 
-procedure test1;
+procedure test1(var t1: integer);
 begin
     if t1 = 10 then
         t1 := 9
@@ -16,7 +16,7 @@ begin
     end
 end test1;
 
-procedure test2;
+procedure test2(var t1: integer);
 begin
     if t1 = 10 then
         halt(fail)
@@ -27,7 +27,7 @@ begin
     end
 end test2;
 
-procedure test3;
+procedure test3(var t1: integer);
 begin
     if t1 = 10 then
         halt(fail)
@@ -43,9 +43,9 @@ begin
     t1 := 10;
 
     (* do modifications of global var t1 *)
-    test1;
-    test2;
-    test3;
+    test1(t1);
+    test2(t1);
+    test3(t1);
 
     (* t1 must be pass *)
     halt(t1)

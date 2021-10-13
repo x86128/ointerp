@@ -39,7 +39,6 @@ def compile_procs(env, procs):
         env[-1]['proc_ptr'] = proc_ptr
         env[-1]['args'] = arg_list
         proc_tab[proc.name] = {'offset': proc_ptr, "args": arg_list, 'arg_sz': len(arg_list),
-                               'consts': env[-1]['consts'],
                                'vars': w_env,
                                'v_size': w_offset}
 
@@ -59,8 +58,8 @@ def eval_static_const_expr(env, text):
         elif instr[0] == 'CLOAD':
             found = False
             for scope in env[::-1]:
-                if instr[2] in scope['consts']:
-                    stack.append(scope['consts'][instr[2]]['val'])
+                if instr[2] in c_tab:
+                    stack.append(c_tab[instr[2]]['val'])
                     found = True
             if not found:
                 raise SyntaxError(f'Undefined const {instr[1]}')
@@ -97,27 +96,25 @@ def eval_static_const_expr(env, text):
 
 
 c_mem = []
+c_tab = {}
 
 
 def compile_consts(env, const_list):
-    global c_mem
+    global c_mem, c_tab
     if len(const_list) < 1:
         return
     for const in const_list:
-        if const.name in env[-1]['consts']:
+        if const.name in c_tab:
             raise SyntaxError(f"Переопределение константы `{const.name}` в строке {const.line}")
-        for scope in env[::-1]:
-            if const.name in scope['consts']:
-                print(f"Переопределение константы `{const.name}` в строке {const.line} вышестоящей области видимости")
-                break
         t = compile_expression(env, const.expr)
         c_val = eval_static_const_expr(env, t)
 
         c_mem.append(c_val)
-        env[-1]['consts'][const.name] = {'val': c_val, 'line': const.line, 'offset': len(c_mem) - 1}
+        c_tab[const.name] = {'val': c_val, 'line': const.line, 'offset': len(c_mem) - 1}
 
 
 def compile_vars(env, variables):
+    global c_tab
     if not variables:
         return
     offset = 0
@@ -132,14 +129,9 @@ def compile_vars(env, variables):
                 print(f"WARN: Переопределение переменной `{v.name}` в строке {v.line} из внешней области видимости")
                 break
         # ищем в константах и их областях видимости
-        if v.name in env[-1]['consts']:
+        if v.name in c_tab:
             print(f"ERR: Имя переменной `{v.name}` в строке {v.line} не может совпадать с именем константы")
             sys.exit(1)
-        for scope in env[::-1]:
-            if v.name in scope['consts']:
-                print(f"WARN: Имя переменной `{v.name}` в строке {v.line} совпадает с именем константы из "
-                      f"внешней области видимости")
-                break
         if v.type.typ == 'TYPE':  # scalar type
             env[-1]['vars'][v.name] = {'typ': 'integer', 'offset': offset, 'size': 1}
             offset += 1
@@ -156,7 +148,7 @@ def compile_vars(env, variables):
 
 
 def compile_decls(env, decls):
-    env.append({'consts': {}, 'vars': {}, 'args': {}})
+    env.append({'vars': {}, 'args': {}})
     compile_consts(env, decls.c_list)
     compile_vars(env, decls.v_list)
     v_size = 0
@@ -164,9 +156,8 @@ def compile_decls(env, decls):
         v_size += env[-1]['vars'][v]['size']
     env[-1]['v_size'] = v_size
     compile_procs(env, decls.p_list)
-    consts = env[-1]['consts']
     vars = env[-1]['vars']
-    return v_size, consts, vars
+    return v_size, vars
 
 
 label_counter = 0
@@ -237,7 +228,7 @@ def compile_args(env, ap, proc_name):
         for i, arg in enumerate(ap.arg_list):
             text += compile_expression(env, arg)
     else:
-        arg_list = ['']*len(ap.arg_list)
+        arg_list = [''] * len(ap.arg_list)
         for arg in proc_tab[proc_name]['args']:
             arg_list[proc_tab[proc_name]['args'][arg]['offset']] = arg
         arg_list = arg_list[::-1]
@@ -306,6 +297,7 @@ def compile_statements(env, st_seq):
 
 
 def compile_expression(env, e):
+    global c_mem, c_tab
     if e.typ == 'IDENT':
         raise RuntimeError('Unreachable')
     elif e.typ == 'INTEGER':
@@ -320,8 +312,8 @@ def compile_expression(env, e):
         v_offset = -len(scope['vars'])
         if e.name in scope['vars']:
             return [('VLOAD', v_offset + scope['vars'][e.name]['offset'], e.name)]
-        elif e.name in scope['consts']:
-            return [('CLOAD', scope['consts'][e.name]['offset'], e.name)]
+        elif e.name in c_tab:
+            return [('CLOAD', c_tab[e.name]['offset'], e.name)]
         elif e.name in scope['args']:
             v_offset -= (1 + scope['args'][e.name]['offset'])
             if scope['args'][e.name]['var']:
@@ -384,8 +376,8 @@ def compile_module(ast):
     global proc_tab, proc_ptr, program_mem, c_mem
     if ast.typ != 'MODULE':
         raise "Module required"
-    env = [{'consts': {}, 'vars': {}, 'args': {}}]
-    v_size, consts, vars = compile_decls(env, ast.decls)
+    env = [{'vars': {}, 'args': {}}]
+    v_size, vars = compile_decls(env, ast.decls)
     text = compile_statements(env, ast.st_seq)
     env.pop()
     text.append(('STOP', '12345'))
@@ -400,6 +392,6 @@ def compile_module(ast):
         sys.exit(1)
     proc_tab[main_name] = {'offset': proc_ptr}
     proc_ptr += len(text)
-    return {'name': ast.name, 'main': main_name, 'consts': consts, 'vars': vars,
+    return {'name': ast.name, 'main': main_name, 'c_tab': c_tab, 'vars': vars,
             'v_size': v_size, 'p_text': program_mem, 'c_mem': c_mem,
             'proc_tab': proc_tab}

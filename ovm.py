@@ -44,7 +44,9 @@ system_procs = {'writeint': writeint,
 def exec_text(start_pc):
     global c_mem, d_mem, sp, bp, p_text, proc_tab, trace_enabled
     pc = start_pc
+
     op_counter = 0
+    d_mem_max = 0
     # fill labels with addresses
     labels = dict()
     for i, v in enumerate(p_text):
@@ -56,7 +58,7 @@ def exec_text(start_pc):
         pc_next = pc + 1
         op = cmd[0]
         if op == 'STOP':
-            print(f'STOP at {pc}')
+            print(f'STOP at {pc}, CYCLES={op_counter}, max stack size: {d_mem_max}')
             break
         elif op_counter > 1000:
             print("Executed more then", op_counter, "instructions")
@@ -109,6 +111,8 @@ def exec_text(start_pc):
             sp -= cmd[1]
         elif op == 'SYSCALL':
             if cmd[1] in system_procs:
+                if cmd[1] == 'halt':
+                    print(f'HALT at {pc}, CYCLES={op_counter}, max stack size: {d_mem_max}')
                 system_procs[cmd[1]]()
             else:
                 raise RuntimeError(f'Undefined system procedure {cmd[1]}')
@@ -154,7 +158,10 @@ def exec_text(start_pc):
         if trace_enabled:
             print(f'OP={cmd} PC={pc} BP={bp} SP={sp} D_MEM={d_mem[:sp]}')
         pc = pc_next
+
         op_counter += 1
+        if d_mem_max < sp:
+            d_mem_max = sp
 
 
 c_mem = []
@@ -167,10 +174,11 @@ trace_enabled = False
 
 
 def run_code(module, trace=False):
-    global c_mem, proc_tab, p_text, d_mem, bp, sp, trace_enabled
+    global c_mem, c_tab, proc_tab, p_text, d_mem, bp, sp, trace_enabled
 
     trace_enabled = trace
     c_mem = module['c_mem']
+    c_tab = module['c_tab']
     proc_tab = module['proc_tab']
     p_text = module['p_text']
 
