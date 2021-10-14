@@ -8,22 +8,14 @@ system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1},
 
 text = []
 pc = 0
-fixup_addrs = []
 
 
 def emit(cmd):
-    global text, label_tab, pc, fixup_addrs
+    global text, label_tab, pc
     if cmd[0] == 'LABEL':
         label_tab[cmd[1]] = pc
         return
-    elif cmd[0] in ['BR', 'BR_ZERO']:
-        if cmd[1] in label_tab:
-            text.append((cmd[0], label_tab[cmd[1]]))
-        else:
-            text.append(cmd)
-            fixup_addrs.append(pc)
-    else:
-        text.append(cmd)
+    text.append(cmd)
     pc += 1
 
 
@@ -429,7 +421,10 @@ def compile_module(ast):
     for i in range(len(text)):
         cmd = text[i]
         if cmd[0] in ['BR', 'BR_ZERO']:
-            text[i] = (cmd[0], label_tab[cmd[1]])
+            if cmd[1] in label_tab:
+                text[i] = (cmd[0], label_tab[cmd[1]])
+            else:
+                raise SyntaxError(f'Переход на неизвестную метку {cmd[1]}')
 
     # TODO: optimisations on IR code
 
@@ -440,7 +435,7 @@ def compile_module(ast):
                 text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
             else:
                 c_mem.append(text[i][1])
-                c_tab[text[i][1]] = {'offset': len(c_mem)-1, 'val': text[i][1]}
+                c_tab[text[i][1]] = {'offset': len(c_mem) - 1, 'val': text[i][1]}
                 text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
 
     return {'name': ast.name, 'main': main_name, 'c_tab': c_tab, 'vars': vars,
