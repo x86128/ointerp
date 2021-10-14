@@ -7,20 +7,15 @@ system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1},
                 'halt': {'v_size': 0, 'arg_sz': 1}}
 
 text = []
-pc = 0
 
 
 def emit(cmd):
-    global text, label_tab, pc
-    if cmd[0] == 'LABEL':
-        label_tab[cmd[1]] = pc
-        return
+    global text
     text.append(cmd)
-    pc += 1
 
 
 def compile_procs(env, procs):
-    global proc_ptr, proc_tab, pc
+    global proc_tab, pc
     if not procs:
         return
     for proc in procs:
@@ -47,12 +42,13 @@ def compile_procs(env, procs):
             w_offset += env[-1]["vars"][var]['size']
         # generating body text
         env[-1]['proc'] = proc.name
-        env[-1]['proc_ptr'] = pc
+        # env[-1]['proc_ptr'] = pc
         env[-1]['args'] = arg_list
-        proc_tab[proc.name] = {'offset': pc, "args": arg_list, 'arg_sz': len(arg_list),
+        proc_tab[proc.name] = {"args": arg_list, 'arg_sz': len(arg_list),
                                'vars': w_env,
                                'v_size': w_offset}
 
+        emit(('LABEL', proc.name))
         compile_statements(env, proc.body.st_seq)
         emit(('RETURN', ''))
 
@@ -290,13 +286,12 @@ def compile_statements(env, st_seq):
             else:
                 v_sz = proc_tab[st.name]['v_size']
                 arg_sz = proc_tab[st.name]['arg_sz']
-                p_ptr = proc_tab[st.name]['offset']
             if v_sz > 0:
                 emit(('ALLOC', v_sz))
             if st.name in system_procs:
                 emit(('SYSCALL', st.name))
             else:
-                emit(('CALL', p_ptr, st.name))
+                emit(('CALL', st.name))
             if v_sz + arg_sz > 0:
                 emit(('DEALLOC', v_sz + arg_sz))
         elif st.typ == 'ASSIGN':
@@ -395,6 +390,39 @@ proc_tab = {}
 main_ptr = 0
 
 
+def optimize(text):
+    done = False
+    while not done:
+        done = True
+        for i in range(2, len(text)):
+            op3 = text[i]
+            if op3[0] == 'BINOP':
+                op1 = text[i - 2]
+                if op1[0] != 'CONST':
+                    continue
+                op2 = text[i - 1]
+                if op2[0] != 'CONST':
+                    continue
+                head = text[:i - 2]
+                if op3[1] == '+':
+                    head.append(('CONST', op1[1] + op2[1]))
+                elif op3[1] == '-':
+                    head.append(('CONST', op1[1] - op2[1]))
+                elif op3[1] == '*':
+                    head.append(('CONST', op1[1] * op2[1]))
+                elif op3[1] == 'DIV':
+                    head.append(('CONST', int(op1[1] / op2[1])))
+                elif op3[1] == 'MOD':
+                    head.append(('CONST', op1[1] % op2[1]))
+                else:
+                    raise SyntaxError(f'Unknown BINOP in optimizer {op3}')
+                head += text[i + 1:]
+                done = False
+                text = head
+                break
+    return text
+
+
 def compile_module(ast):
     global proc_tab, c_mem, pc, text, label_tab
     if ast.typ != 'MODULE':
@@ -402,8 +430,8 @@ def compile_module(ast):
     env = [{'vars': {}, 'args': {}}]
     v_size, vars = compile_decls(env, ast.decls)
 
-    main_ptr = pc
-
+    main_name = ast.name + "_main"
+    emit(('LABEL', main_name))
     if v_size > 0:
         emit(('ALLOC', v_size))
     compile_statements(env, ast.st_seq)
@@ -411,22 +439,33 @@ def compile_module(ast):
 
     emit(('STOP', '12345'))
 
-    main_name = ast.name + "_main"
     if main_name in proc_tab:
         print(f"Модуль {ast.name} не может содержать процедуру с именем `{main_name}`")
         sys.exit(1)
-    proc_tab[main_name] = {'offset': main_ptr}
 
-    # fixup known labels
+    # do optimisations on IR code
+    text = optimize(text)
+
+    # resolve labels
+    pc = 0
+    text_wo_labels = []
     for i in range(len(text)):
         cmd = text[i]
-        if cmd[0] in ['BR', 'BR_ZERO']:
+        if cmd[0] == 'LABEL':
+            label_tab[cmd[1]] = pc
+        else:
+            text_wo_labels.append(text[i])
+            pc += 1
+
+    text = text_wo_labels
+
+    for i in range(len(text)):
+        cmd = text[i]
+        if cmd[0] in ['BR', 'BR_ZERO', 'CALL']:
             if cmd[1] in label_tab:
                 text[i] = (cmd[0], label_tab[cmd[1]])
             else:
                 raise SyntaxError(f'Переход на неизвестную метку {cmd[1]}')
-
-    # TODO: optimisations on IR code
 
     # move constants from expressions to const_tab
     for i in range(len(text)):
@@ -437,6 +476,12 @@ def compile_module(ast):
                 c_mem.append(text[i][1])
                 c_tab[text[i][1]] = {'offset': len(c_mem) - 1, 'val': text[i][1]}
                 text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+
+    for p in proc_tab:
+        pp = proc_tab[p]
+        pp['offset'] = label_tab[p]
+        proc_tab[p] = pp
+    proc_tab[main_name] = {'offset': label_tab[main_name]}
 
     return {'name': ast.name, 'main': main_name, 'c_tab': c_tab, 'vars': vars,
             'v_size': v_size, 'p_text': text, 'c_mem': c_mem,

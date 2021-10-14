@@ -36,7 +36,7 @@ def print_listing(module):
 
 
 if __name__ == "__main__":
-    source = TokenStream('sample/towers.o0')
+    source = TokenStream('sample/sample.o0')
     syn_tree = parse_module(source)
     if source.errors:
         print(source.errors[0])
