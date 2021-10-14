@@ -22,7 +22,7 @@ def print_listing(module):
         else:
             print(f'{" " * (name_max + 1)} ', end='')
         if t[0] != 'LABEL':
-            print(f'{t[0]:<8} {t[1]:>10}', end='')
+            print(f'{t[0]:<8} {t[1]:<10}', end='')
         print()
     print("\nCONSTANT TABLE:")
     consts = {module['c_tab'][c]['offset']: c for c in module['c_tab']}
@@ -36,7 +36,7 @@ def print_listing(module):
 
 
 if __name__ == "__main__":
-    source = TokenStream('sample/if_stat.o0')
+    source = TokenStream('sample/towers.o0')
     syn_tree = parse_module(source)
     if source.errors:
         print(source.errors[0])

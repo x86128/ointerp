@@ -47,11 +47,6 @@ def exec_text(start_pc):
 
     op_counter = 0
     d_mem_max = 0
-    # fill labels with addresses
-    labels = dict()
-    for i, v in enumerate(p_text):
-        if v[0] == 'LABEL':
-            labels[v[1]] = i
     # exec instructions
     while True:
         cmd = p_text[pc]
@@ -59,6 +54,11 @@ def exec_text(start_pc):
         op = cmd[0]
         if op == 'STOP':
             print(f'STOP at {pc}, CYCLES={op_counter}, max stack size: {d_mem_max}')
+            code = int(cmd[1])
+            if code == PASS:
+                print('SUCCESS')
+            elif code == FAIL:
+                print('FAIL')
             break
         elif op_counter > 1000:
             print("Executed more then", op_counter, "instructions")
@@ -148,9 +148,9 @@ def exec_text(start_pc):
         elif op == 'BR_ZERO':
             sp -= 1
             if not d_mem[sp]:
-                pc_next = labels[cmd[1]]
+                pc_next = cmd[1]
         elif op == 'BR':
-            pc_next = labels[cmd[1]]
+            pc_next = cmd[1]
         elif op == 'LABEL':
             pass
         else:

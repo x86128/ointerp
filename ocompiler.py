@@ -6,9 +6,29 @@ system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1},
                 'writeln': {'v_size': 0, 'arg_sz': 0},
                 'halt': {'v_size': 0, 'arg_sz': 1}}
 
+text = []
+pc = 0
+fixup_addrs = []
+
+
+def emit(cmd):
+    global text, label_tab, pc, fixup_addrs
+    if cmd[0] == 'LABEL':
+        label_tab[cmd[1]] = pc
+        return
+    elif cmd[0] in ['BR', 'BR_ZERO']:
+        if cmd[1] in label_tab:
+            text.append((cmd[0], label_tab[cmd[1]]))
+        else:
+            text.append(cmd)
+            fixup_addrs.append(pc)
+    else:
+        text.append(cmd)
+    pc += 1
+
 
 def compile_procs(env, procs):
-    global proc_ptr, proc_tab, program_mem
+    global proc_ptr, proc_tab, pc
     if not procs:
         return
     for proc in procs:
@@ -34,19 +54,16 @@ def compile_procs(env, procs):
                           'typ': env[-1]["vars"][var]['typ']}
             w_offset += env[-1]["vars"][var]['size']
         # generating body text
-        text = []
         env[-1]['proc'] = proc.name
-        env[-1]['proc_ptr'] = proc_ptr
+        env[-1]['proc_ptr'] = pc
         env[-1]['args'] = arg_list
-        proc_tab[proc.name] = {'offset': proc_ptr, "args": arg_list, 'arg_sz': len(arg_list),
+        proc_tab[proc.name] = {'offset': pc, "args": arg_list, 'arg_sz': len(arg_list),
                                'vars': w_env,
                                'v_size': w_offset}
 
-        text += compile_statements(env, proc.body.st_seq)
-        text.append(('RETURN', ''))
+        compile_statements(env, proc.body.st_seq)
+        emit(('RETURN', ''))
 
-        program_mem += text
-        proc_ptr += len(text)
         env.pop()
 
 
@@ -163,36 +180,37 @@ def compile_decls(env, decls):
 label_counter = 0
 label_tab = {}
 
+
 def set_label(l_name):
     global label_tab
+
 
 def compile_while(env, st):
     global label_counter
     label = label_counter
     label_counter += 2
-    text = [('LABEL', f'L{label}')]
-    text += compile_expression(env, st.expr)
-    text.append(('BR_ZERO', f'L{label + 1}'))
-    text += compile_statements(env, st.st_seq)
-    text.append(('BR', f'L{label}'))
-    text.append(('LABEL', f'L{label + 1}'))
-    return text
+    emit(('LABEL', f'L{label}'))
+    for t in compile_expression(env, st.expr):
+        emit(t)
+    emit(('BR_ZERO', f'L{label + 1}'))
+    compile_statements(env, st.st_seq)
+    emit(('BR', f'L{label}'))
+    emit(('LABEL', f'L{label + 1}'))
 
 
 def compile_repeat(env, st):
     global label_counter
     label = label_counter
     label_counter += 1
-    text = [('LABEL', f'L{label}')]
-    text += compile_statements(env, st.st_seq)
-    text += compile_expression(env, st.expr)
-    text.append(('BR_ZERO', f'L{label}'))
-    return text
+    emit(('LABEL', f'L{label}'))
+    compile_statements(env, st.st_seq)
+    for t in compile_expression(env, st.expr):
+        emit(t)
+    emit(('BR_ZERO', f'L{label}'))
 
 
 def compile_if(env, st):
     global label_counter
-    text = []
     # labels allocation
     label = label_counter
     # label for elsif block
@@ -201,37 +219,38 @@ def compile_if(env, st):
     exit_label = else_label + len(st.else_block)
     label_counter = exit_label + 1
     # compiling IF expression
-    text += compile_expression(env, st.expr)
+    for t in compile_expression(env, st.expr):
+        emit(t)
     if len(st.elsif_block) > 0:
-        text.append(('BR_ZERO', f'L{elsif_label}'))
+        emit(('BR_ZERO', f'L{elsif_label}'))
     elif len(st.else_block) > 0:
-        text.append(('BR_ZERO', f'L{else_label}'))
+        emit(('BR_ZERO', f'L{else_label}'))
     else:
-        text.append(('BR_ZERO', f'L{exit_label}'))
-    text += compile_statements(env, st.then_block)
+        emit(('BR_ZERO', f'L{exit_label}'))
+    compile_statements(env, st.then_block)
     if len(st.else_block) > 0 or len(st.elsif_block) > 0:
-        text.append(('BR', f'L{exit_label}'))
+        emit(('BR', f'L{exit_label}'))
     # compiling ELSIF blocks if any
     for i, elsifb in enumerate(st.elsif_block):
-        text.append(('LABEL', f'L{elsif_label}'))
-        text += compile_expression(env, elsifb.expr)
-        text.append(('BR_ZERO', f'L{elsif_label + i + 1}'))
-        text += compile_statements(env, elsifb.st_seq)
-        text.append(('BR', f'L{exit_label}'))
+        emit(('LABEL', f'L{elsif_label}'))
+        for t in compile_expression(env, elsifb.expr):
+            emit(t)
+        emit(('BR_ZERO', f'L{elsif_label + i + 1}'))
+        compile_statements(env, elsifb.st_seq)
+        emit(('BR', f'L{exit_label}'))
     # compiling ELSE block if any
     if len(st.else_block) > 0:
-        text.append(('LABEL', f'L{else_label}'))
-        text += compile_statements(env, st.else_block[0])
-    text.append(('LABEL', f'L{exit_label}'))
-    return text
+        emit(('LABEL', f'L{else_label}'))
+        compile_statements(env, st.else_block[0])
+    emit(('LABEL', f'L{exit_label}'))
 
 
 def compile_args(env, ap, proc_name):
     global proc_tab
-    text = []
     if proc_name in system_procs:
         for i, arg in enumerate(ap.arg_list):
-            text += compile_expression(env, arg)
+            for t in compile_expression(env, arg):
+                emit(t)
     else:
         arg_list = [''] * len(ap.arg_list)
         for arg in proc_tab[proc_name]['args']:
@@ -240,32 +259,31 @@ def compile_args(env, ap, proc_name):
         for i, arg in enumerate(ap.arg_list):
             if proc_tab[proc_name]['args'][arg_list[i]]['var']:
                 t = compile_expression(env, arg)
-                text.append(('ADR_LOAD', t[-1][1], t[-1][2]))
+                emit(('ADR_LOAD', t[-1][1], t[-1][2]))
             else:
-                text += compile_expression(env, arg)
-    return text
+                for t in compile_expression(env, arg):
+                    emit(t)
 
 
 def compile_statements(env, st_seq):
     global system_procs
-    text = []
     if not st_seq:
-        return text
+        return
 
     for i, st in enumerate(st_seq.st_seq):
         if st.typ == 'WHILE':
-            text += compile_while(env, st)
+            compile_while(env, st)
         elif st.typ == 'REPEAT':
-            text += compile_repeat(env, st)
+            compile_repeat(env, st)
         elif st.typ == 'CALL':
             if st.name in system_procs:
                 if system_procs[st.name]['arg_sz'] > 0:
                     raise SyntaxError(f'В процедуру {st.name} не переданы параметры')
-                text.append(('SYSCALL', st.name))
+                emit(('SYSCALL', st.name))
             else:
                 if proc_tab[st.name]['arg_sz'] > 0:
                     raise SyntaxError(f'В процедуру {st.name} не переданы параметры')
-                text.append(('CALL', st.name))
+                emit(('CALL', st.name))
         elif st.typ == 'CALL_P':
             if st.name in system_procs:
                 if len(st.args.arg_list) != system_procs[st.name]['arg_sz']:
@@ -273,7 +291,7 @@ def compile_statements(env, st_seq):
             elif st.name in proc_tab:
                 if len(st.args.arg_list) != proc_tab[st.name]['arg_sz']:
                     raise SyntaxError(f'Процедура {st.name} ожидает {proc_tab[st.name]["arg_sz"]} параметров')
-            text += compile_args(env, st.args, st.name)
+            compile_args(env, st.args, st.name)
             if st.name in system_procs:
                 v_sz = system_procs[st.name]['v_size']
                 arg_sz = system_procs[st.name]['arg_sz']
@@ -282,33 +300,32 @@ def compile_statements(env, st_seq):
                 arg_sz = proc_tab[st.name]['arg_sz']
                 p_ptr = proc_tab[st.name]['offset']
             if v_sz > 0:
-                text.append(('ALLOC', v_sz))
+                emit(('ALLOC', v_sz))
             if st.name in system_procs:
-                text.append(('SYSCALL', st.name))
+                emit(('SYSCALL', st.name))
             else:
-                text.append(('CALL', p_ptr, st.name))
+                emit(('CALL', p_ptr, st.name))
             if v_sz + arg_sz > 0:
-                text.append(('DEALLOC', v_sz + arg_sz))
+                emit(('DEALLOC', v_sz + arg_sz))
         elif st.typ == 'ASSIGN':
             for t in compile_expression(env, st.expr):
-                text.append(t)
+                emit(t)
             v_offset = -len(env[-1]['vars'])
             if st.name in env[-1]['vars']:
                 v_offset += env[-1]['vars'][st.name]['offset']
-                text.append(('VSTOR', v_offset, st.name))
+                emit(('VSTOR', v_offset, st.name))
             elif st.name in env[-1]['args']:
                 v_offset -= (1 + env[-1]['args'][st.name]['offset'])
                 if env[-1]['args'][st.name]['var']:
-                    text.append(('RSTOR', v_offset, st.name))
+                    emit(('RSTOR', v_offset, st.name))
                 else:
-                    text.append(('VSTOR', v_offset, st.name))
+                    emit(('VSTOR', v_offset, st.name))
             else:
                 raise SystemError(f'Ошибка в строке {st.line}: Присваивание позволено только локальным переменным')
         elif st.typ == 'IF_STAT':
-            text += compile_if(env, st)
+            compile_if(env, st)
         else:
             raise SyntaxError(f'Unknown stat: {st}')
-    return text
 
 
 def compile_expression(env, e):
@@ -382,31 +399,50 @@ def compile_expression(env, e):
     raise RuntimeError(f"Unknown expr: {e}")
 
 
-program_mem = []
 proc_tab = {}
-proc_ptr = 0
+main_ptr = 0
 
 
 def compile_module(ast):
-    global proc_tab, proc_ptr, program_mem, c_mem
+    global proc_tab, c_mem, pc, text, label_tab
     if ast.typ != 'MODULE':
         raise "Module required"
     env = [{'vars': {}, 'args': {}}]
     v_size, vars = compile_decls(env, ast.decls)
-    text = compile_statements(env, ast.st_seq)
-    env.pop()
-    text.append(('STOP', '12345'))
-    if proc_ptr + len(text) > 65536:
-        print(f"При компиляции модуля {ast.name} вышли за пределы памяти:", proc_ptr + len(text))
+
+    main_ptr = pc
+
     if v_size > 0:
-        program_mem.append(('ALLOC', v_size))
-    program_mem += text
+        emit(('ALLOC', v_size))
+    compile_statements(env, ast.st_seq)
+    env.pop()
+
+    emit(('STOP', '12345'))
+
     main_name = ast.name + "_main"
     if main_name in proc_tab:
         print(f"Модуль {ast.name} не может содержать процедуру с именем `{main_name}`")
         sys.exit(1)
-    proc_tab[main_name] = {'offset': proc_ptr}
-    proc_ptr += len(text)
+    proc_tab[main_name] = {'offset': main_ptr}
+
+    # fixup known labels
+    for i in range(len(text)):
+        cmd = text[i]
+        if cmd[0] in ['BR', 'BR_ZERO']:
+            text[i] = (cmd[0], label_tab[cmd[1]])
+
+    # TODO: optimisations on IR code
+
+    # move constants from expressions to const_tab
+    for i in range(len(text)):
+        if text[i][0] == 'CONST':
+            if text[i][1] in c_tab:
+                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+            else:
+                c_mem.append(text[i][1])
+                c_tab[text[i][1]] = {'offset': len(c_mem)-1, 'val': text[i][1]}
+                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+
     return {'name': ast.name, 'main': main_name, 'c_tab': c_tab, 'vars': vars,
-            'v_size': v_size, 'p_text': program_mem, 'c_mem': c_mem,
+            'v_size': v_size, 'p_text': text, 'c_mem': c_mem,
             'proc_tab': proc_tab}
