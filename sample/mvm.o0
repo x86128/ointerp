@@ -1,0 +1,12 @@
+MODULE Halt;
+const
+    pass = 12345;
+    fail = 54321;
+
+var a : integer;
+
+begin
+    a := 5;
+    writeint(a + 10);
+    writeln
+END Halt.

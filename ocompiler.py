@@ -1,10 +1,10 @@
 import pprint
 import sys
 
-system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1},
-                'writespace': {'v_size': 0, 'arg_sz': 1},
-                'writeln': {'v_size': 0, 'arg_sz': 0},
-                'halt': {'v_size': 0, 'arg_sz': 1}}
+system_procs = {'writeint': {'v_size': 0, 'arg_sz': 1, 'sys_num': 0},
+                'writespace': {'v_size': 0, 'arg_sz': 1, 'sys_num': 1},
+                'writeln': {'v_size': 0, 'arg_sz': 0, 'sys_num': 2},
+                'halt': {'v_size': 0, 'arg_sz': 1, 'sys_num': 3}}
 
 text = []
 
@@ -49,8 +49,10 @@ def compile_procs(env, procs):
                                'v_size': w_offset}
 
         emit(('LABEL', proc.name))
+        emit(('ENTER', proc.name))
         compile_statements(env, proc.body.st_seq)
-        emit(('RETURN', ''))
+        emit(('LEAVE', proc.name))
+        emit(('RETURN', proc.name))
 
         env.pop()
 
@@ -423,6 +425,153 @@ def optimize(text):
     return text
 
 
+def convert_to_besm(text):
+    # pprint.pp(text)
+    done = False
+    while not done:
+        done = True
+        l = len(text)
+        for i in range(l):
+            if text[i][0] == 'ALLOC':
+                text[i] = ('UTM', text[i][1], 15)
+                done = False
+                break
+            elif text[i][0] == 'DEALLOC':
+                text[i] = ('UTM', -text[i][1], 15)
+                done = False
+                break
+            elif text[i][0] == 'VLOAD':
+                addr = text[i][1]
+                text.pop(i)
+                text.insert(i, ('XTA', addr, 1))
+                text.insert(i + 1, ('ATX', 0, 15))
+                done = False
+                break
+            elif text[i][0] == 'VSTOR':
+                addr = text[i][1]
+                text.pop(i)
+                text.insert(i, ('XTA', 0, 15))
+                text.insert(i + 1, ('ATX', addr, 1))
+                done = False
+                break
+            elif text[i][0] == 'CLOAD':
+                addr = text[i][1]
+                text.pop(i)
+                text.insert(i, ('XTA', addr, 2))
+                text.insert(i + 1, ('ATX', 0, 15))
+                done = False
+                break
+            elif text[i][0] == 'SYSCALL':
+                text[i] = ('*77', system_procs[text[i][1]]['sys_num'], 0)
+                done = False
+                break
+            elif text[i][0] == 'STOP':
+                text[i] = ('STOP', int(text[i][1]), 0)
+            elif text[i][0] == 'CALL':
+                t = text[i]
+                text.pop(i)
+                # save M1
+                text.insert(i, ('ITA', 1, 0))
+                text.insert(i + 1, ('ATX', 0, 15))
+                # set M1 = SP - 1
+                text.insert(i + 2, ('MTJ', 1, 15))
+                text.insert(i + 3, ('UTM', -1, 1))
+                # call
+                text.insert(i + 4, ('VJM', t[1], 14))
+                done = False
+                break
+            elif text[i][0] == 'ENTER':
+                t = text[i]
+                text.pop(i)
+                # save return address M14
+                text.insert(i, ('ITA', 14, 0))
+                text.insert(i + 1, ('ATX', 0, 15))
+                done = False
+                break
+            elif text[i][0] == 'LEAVE':
+                t = text[i]
+                text.pop(i)
+                # get return address to M14
+                text.insert(i, ('XTA', 0, 15))
+                text.insert(i + 1, ('ATI', 14, 0))
+                done = False
+                break
+            elif text[i][0] == 'RETURN':
+                t = text[i]
+                text.pop(i)
+                # restore M1 address
+                text.insert(i, ('XTA', 0, 15))
+                text.insert(i + 1, ('ATI', 1, 0))
+                text.insert(i + 2, ('UJ', 0, 14))
+                done = False
+                break
+            elif text[i][0] == 'RELOP':
+                r = text.pop(i)
+                b = text.pop(i)
+                if r[1] == '>':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('X-A', -1, 15))
+                    text.insert(i + 2, ('ATX', -2, 15))
+                    text.insert(i + 3, ('UTM', -2, 15))
+                    text.insert(i + 4, ('UZA', b[1], 0))
+                elif r[1] == '<=':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('X-A', -1, 15))
+                    text.insert(i + 2, ('ATX', -2, 15))
+                    text.insert(i + 3, ('UTM', -2, 15))
+                    text.insert(i + 4, ('U1A', b[1], 0))
+                elif r[1] == '<':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A-X', -1, 15))
+                    text.insert(i + 2, ('ATX', -2, 15))
+                    text.insert(i + 3, ('UTM', -2, 15))
+                    text.insert(i + 4, ('UZA', b[1], 0))
+                elif r[1] == '>=':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A-X', -1, 15))
+                    text.insert(i + 2, ('ATX', -2, 15))
+                    text.insert(i + 3, ('UTM', -2, 15))
+                    text.insert(i + 4, ('U1A', b[1], 0))
+                elif r[1] == '=':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('AEX', -1, 15))
+                    text.insert(i + 2, ('ATX', -2, 15))
+                    text.insert(i + 3, ('UTM', -2, 15))
+                    text.insert(i + 4, ('U1A', b[1], 0))
+                elif r[1] == '#':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('AEX', -1, 15))
+                    text.insert(i + 2, ('ATX', -2, 15))
+                    text.insert(i + 3, ('UTM', -2, 15))
+                    text.insert(i + 4, ('UZA', b[1], 0))
+                else:
+                    raise RuntimeError(f"Unknown RELOP {r}")
+                done = False
+                break
+            elif text[i][0] == 'BINOP':
+                b = text.pop(i)
+                if b[1] == '-':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A-X', -1, 15))
+                elif b[1] == '+':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A+X', -1, 15))
+                elif b[1] == '*':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A*X', -1, 15))
+                elif b[1] == '/':
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A/X', -1, 15))
+                text.insert(i + 2, ('ATX', -2, 15))
+                text.insert(i + 3, ('UTM', -1, 15))
+                done = False
+                break
+
+    print()
+    # pprint.pp(text)
+    return text
+
+
 def compile_module(ast):
     global proc_tab, c_mem, pc, text, label_tab
     if ast.typ != 'MODULE':
@@ -439,12 +588,43 @@ def compile_module(ast):
 
     emit(('STOP', '12345'))
 
+    # move constants from expressions to const_tab
+    for i in range(len(text)):
+        if text[i][0] == 'CONST':
+            if text[i][1] in c_tab:
+                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+            else:
+                c_mem.append(text[i][1])
+                c_tab[text[i][1]] = {'offset': len(c_mem) - 1, 'val': text[i][1]}
+                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+    emit(('LABEL', 'const_table'))
+    for c in c_tab:
+        emit(('WORD', c_tab[c]['val']))
+
+    for i in range(v_size):
+        emit(('WORD', 0))
+    emit(('LABEL', 'locals_base'))
+
+    emit(('LABEL', 'stack_base'))
     if main_name in proc_tab:
         print(f"Модуль {ast.name} не может содержать процедуру с именем `{main_name}`")
         sys.exit(1)
 
+    pprint.pp(text)
     # do optimisations on IR code
     text = optimize(text)
+
+
+    # pprint.pprint(text)
+    # convert IR to BESM-6 instructions
+    crt0 = []
+    crt0.append(('VTM', 'locals_base', 1))  # M1 - locals base
+    crt0.append(('VTM', 'stack_base', 15))  # M15 - stack base
+    crt0.append(('VTM', 'const_table', 2))  # M2 - constant base
+    crt0.append(('UJ', main_name, 0))
+
+    text = crt0 + text
+    text = convert_to_besm(text)
 
     # resolve labels
     pc = 0
@@ -459,23 +639,19 @@ def compile_module(ast):
 
     text = text_wo_labels
 
+    # replace branch labels with addresses from label table
     for i in range(len(text)):
         cmd = text[i]
-        if cmd[0] in ['BR', 'BR_ZERO', 'CALL']:
+        if cmd[0] in ['BR', 'BR_ZERO', 'CALL', 'UJ', 'VTM', 'VJM', 'UZA', 'U1A']:
             if cmd[1] in label_tab:
-                text[i] = (cmd[0], label_tab[cmd[1]])
+                t = ''
+                if len(cmd) == 3:
+                    t = cmd[2]
+                text[i] = (cmd[0], label_tab[cmd[1]], t)
+            elif isinstance(cmd[1], int):
+                continue
             else:
-                raise SyntaxError(f'Переход на неизвестную метку {cmd[1]}')
-
-    # move constants from expressions to const_tab
-    for i in range(len(text)):
-        if text[i][0] == 'CONST':
-            if text[i][1] in c_tab:
-                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
-            else:
-                c_mem.append(text[i][1])
-                c_tab[text[i][1]] = {'offset': len(c_mem) - 1, 'val': text[i][1]}
-                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+                raise SyntaxError(f'Переход на неизвестную метку {cmd}')
 
     for p in proc_tab:
         pp = proc_tab[p]
