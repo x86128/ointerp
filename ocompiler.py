@@ -559,9 +559,15 @@ def convert_to_besm(text):
                 elif b[1] == '*':
                     text.insert(i, ('XTA', -2, 15))
                     text.insert(i + 1, ('A*X', -1, 15))
-                elif b[1] == '/':
+                elif b[1] == 'DIV':
                     text.insert(i, ('XTA', -2, 15))
                     text.insert(i + 1, ('A/X', -1, 15))
+                elif b[1] == 'MOD':
+                    # fantasy instruction
+                    text.insert(i, ('XTA', -2, 15))
+                    text.insert(i + 1, ('A%X', -1, 15))
+                else:
+                    raise SyntaxError(f"Unknown BINOP: {b}")
                 text.insert(i + 2, ('ATX', -2, 15))
                 text.insert(i + 3, ('UTM', -1, 15))
                 done = False
@@ -612,7 +618,7 @@ def compile_module(ast):
 
     pprint.pp(text)
     # do optimisations on IR code
-    text = optimize(text)
+    # text = optimize(text)
 
 
     # pprint.pprint(text)

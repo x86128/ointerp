@@ -132,6 +132,13 @@ class MCPU:
                 x = self.mem[uaddr][1]
                 self.set_acc(int(self.acc / x))
                 self.mode = 'mul'
+            elif op == 'A%X':
+                if stack:
+                    self.set_m(15, self.get_m(15) - 1)
+                    uaddr = (self.get_m(15) + vaddr) & 0x7fff
+                x = self.mem[uaddr][1]
+                self.set_acc(self.acc % x)
+                self.mode = 'mul'
             elif op == 'MTJ':
                 self.set_m(vaddr, self.get_m(mod))
             elif op == 'ATI':
@@ -152,4 +159,4 @@ class MCPU:
                 raise RuntimeError(f'Unknown OP={cmd}')
             self.pc = pc_next
             if self.tracing:
-                print(self.mem[114:154])
+                print(self.mem[35:45])
