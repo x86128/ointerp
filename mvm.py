@@ -76,6 +76,11 @@ class MCPU:
                     uaddr = (self.get_m(15) + vaddr) & 0x7fff
                 self.set_acc(self.mem[uaddr][1])
                 self.mode = 'log'
+            elif op == 'XTS':
+                self.mem[self.get_m(15)] = ('WORD', self.acc, 0)
+                self.set_m(15, self.get_m(15) + 1)
+                self.set_acc(self.mem[uaddr][1])
+                self.mode = 'log'
             elif op == 'VTM':
                 self.set_m(mod, vaddr)
             elif op == 'UTM':

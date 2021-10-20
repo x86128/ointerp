@@ -15,7 +15,7 @@ def emit(cmd):
 
 
 def compile_procs(env, procs):
-    global proc_tab, pc
+    global proc_tab
     if not procs:
         return
     for proc in procs:
@@ -379,9 +379,26 @@ def compile_expression(env, e):
             return res
     elif e.typ == 'EXPR':  # expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpression].
         if len(e.expr_list) > 1:
-            res = compile_expression(env, e.expr_list[0])
-            res += compile_expression(env, e.expr_list[2])
-            res.append(('RELOP', e.expr_list[1].val))
+            res = []
+            a = compile_expression(env, e.expr_list[0])
+            b = compile_expression(env, e.expr_list[2])
+            r = e.expr_list[1].val
+            if r == '<' or r == '>=':
+                # a - b < 0, a - b >= 0
+                res += a
+                res += b
+                res.append(('BINOP', '-'))
+            elif r == '>' or r == '<=':
+                res += b
+                res += a
+                res.append(('BINOP', '-'))
+            elif r == '=' or r == '#':
+                res += a
+                res += b
+                res.append(('BINOP', 'XOR'))
+            else:
+                raise SyntaxError(f"Unknown BINOP: {r}")
+            res.append(('RELOP', r))
             return res
         else:
             return compile_expression(env, e.expr_list[0])
@@ -392,7 +409,7 @@ proc_tab = {}
 main_ptr = 0
 
 
-def optimize(text):
+def optimize_int_const(text):
     done = False
     while not done:
         done = True
@@ -425,8 +442,125 @@ def optimize(text):
     return text
 
 
+def convert_expressions(text):
+    output = []
+    acc_busy = False
+    M2 = 2
+    M1 = 1
+    text_sz = len(text)
+    for i in range(text_sz):
+        t = text[i]
+        if t[0] == 'CLOAD':
+            if not acc_busy:
+                output.append(('XTA', t[1], M2))
+                acc_busy = True
+            else:
+                output.append(('XTS', t[1], M2))
+        elif t[0] == 'VLOAD':
+            if not acc_busy:
+                if len(output) > 0:
+                    o = output[-1]
+                    if o[0] == 'ATX' and t[1] == o[1] and o[2] == M1:
+                        pass
+                    else:
+                        output.append(('XTA', t[1], M1))
+                else:
+                    output.append(('XTA', t[1], M1))
+                acc_busy = True
+            else:
+                output.append(('XTS', t[1], M1))
+        elif t[0] == 'VSTOR':
+            if not acc_busy:
+                raise SyntaxError(f"Стек пустой")
+            acc_busy = False
+            output.append(('ATX', t[1], M1))
+        elif acc_busy and t[0] in ['SYSCALL', 'CALL']:
+            output.append(('ATX', 0, 15))
+            if t[0] == 'SYSCALL':
+                output.append(('*77', system_procs[t[1]]['sys_num'], 0))
+            elif t[0] == 'CALL':
+                # save M1
+                output.append(('ITA', 1, 0))
+                output.append(('ATX', 0, 15))
+                # set M1 = SP - 1
+                output.append(('MTJ', 1, 15))
+                output.append(('UTM', -1, 1))
+                # call
+                output.append(('VJM', t[1], 14))
+            else:
+                output.append(t)
+            acc_busy = False
+        elif t[0] == 'BINOP':
+            if output[-1][0] in ['XTA', 'XTS']:
+                p = output.pop()
+                if t[1] == '+':
+                    output.append(('A+X', p[1], p[2]))
+                if t[1] == '-':
+                    output.append(('A-X', p[1], p[2]))
+                if t[1] == '*':
+                    output.append(('A*X', p[1], p[2]))
+                if t[1] == 'DIV':
+                    output.append(('A/X', p[1], p[2]))
+            elif output[-1][0] in ['A+X', 'A-X', 'A*X', 'A/X', 'X-A']:
+                if t[1] == '-':
+                    output.append(('X-A', 0, 15))
+                else:
+                    raise SyntaxError(f"Unreachable: {t} {output[-1]}")
+            else:
+                output.append(t)
+        elif t[0] == 'ALLOC':
+            output.append(('UTM', t[1], 15))
+        elif t[0] == 'DEALLOC':
+            output.append(('UTM', -t[1], 15))
+        elif t[0] == 'SYSCALL':
+            output.append(('*77', system_procs[t[1]]['sys_num'], 0))
+        elif t[0] == 'CALL':
+            # save M1
+            output.append(('ITA', 1, 0))
+            output.append(('ATX', 0, 15))
+            # set M1 = SP - 1
+            output.append(('MTJ', 1, 15))
+            output.append(('UTM', -1, 1))
+            # call
+            output.append(('VJM', t[1], 14))
+        elif t[0] == 'STOP':
+            output.append(('STOP', int(t[1]), 0))
+        elif t[0] == 'ENTER':
+            # save return address M14
+            output.append(('ITA', 14, 0))
+            output.append(('ATX', 0, 15))
+        elif t[0] == 'LEAVE':
+            # get return address to M14
+            output.append(('XTA', 0, 15))
+            output.append(('ATI', 14, 0))
+        elif t[0] == 'RETURN':
+            # restore M1 address
+            output.append(('XTA', 0, 15))
+            output.append(('ATI', 1, 0))
+            output.append(('UJ', 0, 14))
+        elif t[0] == 'BR_ZERO':
+            o = output.pop()
+            print(o)
+            if o[1] == '>':
+                output.append(('UZA', t[1], 0))
+            elif o[1] == '<=':
+                output.append(('U1A', t[1], 0))
+            elif o[1] == '<':
+                output.append(('UZA', t[1], 0))
+            elif o[1] == '>=':
+                output.append(('U1A', t[1], 0))
+            elif o[1] == '=':
+                output.append(('U1A', t[1], 0))
+            elif o[1] == '#':
+                output.append(('UZA', t[1], 0))
+            acc_busy = False
+        else:
+            output.append(t)
+
+    return output
+
+
 def convert_to_besm(text):
-    # pprint.pp(text)
     done = False
     while not done:
         done = True
@@ -579,7 +713,7 @@ def convert_to_besm(text):
 
 
 def compile_module(ast):
-    global proc_tab, c_mem, pc, text, label_tab
+    global proc_tab, c_mem, pc, text, label_tab, expressions
     if ast.typ != 'MODULE':
         raise "Module required"
     env = [{'vars': {}, 'args': {}}]
@@ -620,7 +754,6 @@ def compile_module(ast):
     # do optimisations on IR code
     # text = optimize(text)
 
-
     # pprint.pprint(text)
     # convert IR to BESM-6 instructions
     crt0 = []
@@ -630,7 +763,8 @@ def compile_module(ast):
     crt0.append(('UJ', main_name, 0))
 
     text = crt0 + text
-    text = convert_to_besm(text)
+    # text = convert_to_besm(text)
+    text = convert_expressions(text)
 
     # resolve labels
     pc = 0
@@ -650,7 +784,7 @@ def compile_module(ast):
         cmd = text[i]
         if cmd[0] in ['BR', 'BR_ZERO', 'CALL', 'UJ', 'VTM', 'VJM', 'UZA', 'U1A']:
             if cmd[1] in label_tab:
-                t = ''
+                t = 0
                 if len(cmd) == 3:
                     t = cmd[2]
                 text[i] = (cmd[0], label_tab[cmd[1]], t)
