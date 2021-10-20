@@ -504,6 +504,9 @@ def convert_expressions(text):
             elif output[-1][0] in ['A+X', 'A-X', 'A*X', 'A/X', 'X-A']:
                 if t[1] == '-':
                     output.append(('X-A', 0, 15))
+                elif t[1] == 'DIV':
+                    output.append(('XTS', -1, 15))
+                    output.append(('A/X', 0, 15))
                 else:
                     raise SyntaxError(f"Unreachable: {t} {output[-1]}")
             else:

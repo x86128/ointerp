@@ -1,0 +1,10 @@
+MODULE arith;
+
+var
+    a : integer;
+
+begin
+    a := (3 + 5) div (2 + 2);
+    writeint(a);
+    writeln
+END arith.
