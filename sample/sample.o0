@@ -17,6 +17,7 @@ end gcd;
 
 begin
     gcd(27+25*3-(10 div 5),15, t);
+    writeint(t); writeln;
     if t = 5 then
         halt(pass)
     else
