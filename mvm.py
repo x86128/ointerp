@@ -63,7 +63,7 @@ class MCPU:
 
             # execute
             if self.tracing:
-                print(cmd)
+                print(f"PC={self.pc} cmd={cmd}")
             if op == 'ATX':
                 self.mem[uaddr] = ('WORD', self.acc, 0)
                 if self.tracing:
@@ -137,6 +137,20 @@ class MCPU:
                     uaddr = (self.get_m(15) + vaddr) & 0x7fff
                 x = self.mem[uaddr][1]
                 self.set_acc(x ^ self.acc)
+                self.mode = 'log'
+            elif op == 'AAX':
+                if stack:
+                    self.set_m(15, self.get_m(15) - 1)
+                    uaddr = (self.get_m(15) + vaddr) & 0x7fff
+                x = self.mem[uaddr][1]
+                self.set_acc(x & self.acc)
+                self.mode = 'log'
+            elif op == 'AOX':
+                if stack:
+                    self.set_m(15, self.get_m(15) - 1)
+                    uaddr = (self.get_m(15) + vaddr) & 0x7fff
+                x = self.mem[uaddr][1]
+                self.set_acc(x | self.acc)
                 self.mode = 'log'
             elif op == 'A*X':
                 if stack:

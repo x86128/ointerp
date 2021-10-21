@@ -518,8 +518,11 @@ def conv_ir_to_besm(text):
             else:
                 output.append(t)
             acc_busy = False
-        elif t[0] == 'UNARY' and t[1] == '-':
-            output.append(('X-A', 0, 0))
+        elif t[0] == 'UNARY':
+            if t[1] == '-':
+                output.append(('X-A', 0, 0))
+            elif t[1] == '~':
+                output.append(('X-A', 0, 0))
         elif t[0] == 'BINOP':
             if output[-1][0] in ['XTA', 'XTS']:
                 p = output.pop()
@@ -533,9 +536,13 @@ def conv_ir_to_besm(text):
                     output.append(('A/X', p[1], p[2]))
                 elif t[1] == 'XOR':
                     output.append(('AEX', p[1], p[2]))
+                elif t[1] == 'OR':
+                    output.append(('AOX', p[1], p[2]))
+                elif t[1] == '&':
+                    output.append(('AAX', p[1], p[2]))
                 elif t[1] == 'MOD':  # pseudo-op
                     output.append(('A%X', p[1], p[2]))
-            elif output[-1][0] in ['A+X', 'A-X', 'A*X', 'A/X', 'X-A', 'AEX']:
+            elif output[-1][0] in ['A+X', 'A-X', 'A*X', 'A/X', 'X-A', 'AEX', 'AOX', 'AAX']:
                 if t[1] == '-':
                     output.append(('X-A', 0, 15))
                 elif t[1] == 'DIV':
@@ -544,6 +551,12 @@ def conv_ir_to_besm(text):
                 elif t[1] == 'MOD':
                     output.append(('STX', 0, 15))
                     output.append(('A%X', 1, 15))
+                elif t[1] == 'XOR':
+                    output.append(('AEX', 0, 15))
+                elif t[1] == 'OR':
+                    output.append(('AOX', 0, 15))
+                elif t[1] == '&':
+                    output.append(('AAX', 0, 15))
                 else:
                     raise SyntaxError(f"Unreachable: {t} {output[-1]}")
             else:
@@ -617,6 +630,7 @@ def compile_module(ast):
 
     emit(('STOP', '12345'))
 
+    pprint.pp(text)
     text = optimize_int_const(text)
     emit(('LABEL', 'const_table'))
     for c in c_mem:
