@@ -418,14 +418,14 @@ def optimize_int_const(text):
             op3 = text[i]
             if op3[0] == 'BINOP':
                 op1 = text[i - 2]
-                if op1[0] != 'CLOAD':
+                if op1[0] != 'CONST':
                     continue
                 op2 = text[i - 1]
-                if op2[0] != 'CLOAD':
+                if op2[0] != 'CONST':
                     continue
                 head = text[:i - 2]
-                op1 = c_tab[c_mem[op1[1]]]['val']
-                op2 = c_tab[c_mem[op2[1]]]['val']
+                op1 = op1[1]
+                op2 = op2[1]
                 if op3[1] == '+':
                     op3 = op1 + op2
                 elif op3[1] == '-':
@@ -438,15 +438,18 @@ def optimize_int_const(text):
                     op3 = op1 % op2
                 else:
                     raise SyntaxError(f'Unknown BINOP in optimizer {op3}')
-                if op3 not in c_tab:
-                    c_mem.append(op3)
-                    c_tab[op3] = {'offset': len(c_mem) - 1, 'val': op3}
-                head.append(('CLOAD', c_tab[op3]['offset']))
-
+                head.append(('CONST', op3))
                 head += text[i + 1:]
                 done = False
                 text = head
                 break
+    for i in range(len(text)):
+        t = text[i]
+        if t[0] == 'CONST':
+            if t[1] not in c_tab:
+                c_mem.append(t[1])
+                c_tab[t[1]] = {'offset': len(c_mem) - 1, 'val': t[1]}
+            text[i] = ('CLOAD', c_tab[t[1]]['offset'], 2)
     return text
 
 
@@ -477,6 +480,23 @@ def conv_ir_to_besm(text):
                 acc_busy = True
             else:
                 output.append(('XTS', t[1], M1))
+        elif t[0] == 'ADR_LOAD':
+            if acc_busy:
+                output.append(('ATX', 0, 15))
+            output.append(('MTJ', 3, 1))
+            output.append(('UTM', t[1], 3))
+            output.append(('ITA', 3, 0))
+            acc_busy = True
+        elif t[0] == 'RLOAD':
+            if acc_busy:
+                output.append(('ATX', 0, 15))
+            output.append(('WTC', t[1], M1))
+            output.append(('XTA', 0, 0))
+            acc_busy = True
+        elif t[0] == 'RSTOR':
+            acc_busy = False
+            output.append(('WTC', t[1], M1))
+            output.append(('ATX', 0, 0))
         elif t[0] == 'VSTOR':
             if not acc_busy:
                 raise SyntaxError(f"Стек пустой")
@@ -498,23 +518,32 @@ def conv_ir_to_besm(text):
             else:
                 output.append(t)
             acc_busy = False
+        elif t[0] == 'UNARY' and t[1] == '-':
+            output.append(('X-A', 0, 0))
         elif t[0] == 'BINOP':
             if output[-1][0] in ['XTA', 'XTS']:
                 p = output.pop()
                 if t[1] == '+':
                     output.append(('A+X', p[1], p[2]))
-                if t[1] == '-':
+                elif t[1] == '-':
                     output.append(('A-X', p[1], p[2]))
-                if t[1] == '*':
+                elif t[1] == '*':
                     output.append(('A*X', p[1], p[2]))
-                if t[1] == 'DIV':
+                elif t[1] == 'DIV':
                     output.append(('A/X', p[1], p[2]))
-            elif output[-1][0] in ['A+X', 'A-X', 'A*X', 'A/X', 'X-A']:
+                elif t[1] == 'XOR':
+                    output.append(('AEX', p[1], p[2]))
+                elif t[1] == 'MOD':  # pseudo-op
+                    output.append(('A%X', p[1], p[2]))
+            elif output[-1][0] in ['A+X', 'A-X', 'A*X', 'A/X', 'X-A', 'AEX']:
                 if t[1] == '-':
                     output.append(('X-A', 0, 15))
                 elif t[1] == 'DIV':
                     output.append(('STX', 0, 15))
                     output.append(('A/X', 1, 15))
+                elif t[1] == 'MOD':
+                    output.append(('STX', 0, 15))
+                    output.append(('A%X', 1, 15))
                 else:
                     raise SyntaxError(f"Unreachable: {t} {output[-1]}")
             else:
@@ -553,7 +582,6 @@ def conv_ir_to_besm(text):
             output.append(('UJ', 0, 14))
         elif t[0] == 'BR_ZERO':
             o = output.pop()
-            print(o)
             if o[1] == '>':
                 output.append(('UZA', t[1], 0))
             elif o[1] == '<=':
@@ -589,18 +617,10 @@ def compile_module(ast):
 
     emit(('STOP', '12345'))
 
-    # move constants from expressions to const_tab
-    for i in range(len(text)):
-        if text[i][0] == 'CONST':
-            if text[i][1] in c_tab:
-                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
-            else:
-                c_mem.append(text[i][1])
-                c_tab[text[i][1]] = {'offset': len(c_mem) - 1, 'val': text[i][1]}
-                text[i] = ('CLOAD', c_tab[text[i][1]]['offset'])
+    text = optimize_int_const(text)
     emit(('LABEL', 'const_table'))
-    for c in c_tab:
-        emit(('WORD', c_tab[c]['val']))
+    for c in c_mem:
+        emit(('WORD', c))
 
     for i in range(v_size):
         emit(('WORD', 0))
@@ -611,11 +631,6 @@ def compile_module(ast):
         print(f"Модуль {ast.name} не может содержать процедуру с именем `{main_name}`")
         sys.exit(1)
 
-    # do optimisations on IR code
-    text = optimize_int_const(text)
-    pprint.pp(text)
-
-    # pprint.pprint(text)
     # convert IR to BESM-6 instructions
     crt0 = []
     crt0.append(('VTM', 'locals_base', 1))  # M1 - locals base

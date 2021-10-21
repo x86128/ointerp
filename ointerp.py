@@ -42,7 +42,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         source = TokenStream(sys.argv[1])
     else:
-        source = TokenStream('sample/arith.o0')
+        source = TokenStream('sample/sample.o0')
     syn_tree = parse_module(source)
     if source.errors:
         print(source.errors[0])

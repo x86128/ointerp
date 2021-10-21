@@ -125,9 +125,19 @@ class MCPU:
                 if stack:
                     self.set_m(15, self.get_m(15) - 1)
                     uaddr = (self.get_m(15) + vaddr) & 0x7fff
-                x = self.mem[uaddr][1]
+                if uaddr == 0:
+                    x = 0
+                else:
+                    x = self.mem[uaddr][1]
                 self.set_acc(x - self.acc)
                 self.mode = 'add'
+            elif op == 'AEX':
+                if stack:
+                    self.set_m(15, self.get_m(15) - 1)
+                    uaddr = (self.get_m(15) + vaddr) & 0x7fff
+                x = self.mem[uaddr][1]
+                self.set_acc(x ^ self.acc)
+                self.mode = 'log'
             elif op == 'A*X':
                 if stack:
                     self.set_m(15, self.get_m(15) - 1)
@@ -153,6 +163,8 @@ class MCPU:
                 self.set_m(vaddr, self.get_m(mod))
             elif op == 'ATI':
                 self.set_m(uaddr, self.acc)
+            elif op == 'WTC':
+                self.c = self.mem[uaddr][1] & 0x7FFF
             elif op == '*77':
                 if addr == 0:
                     print(self.mem[self.get_m(15) - 1][1], end='')
@@ -166,7 +178,6 @@ class MCPU:
                 else:
                     raise RuntimeError(f"Unknown extracode *77 op: {cmd}")
             else:
-                raise RuntimeError(f'Unknown OP={cmd}')
+                raise RuntimeError(f'Unknown OP={cmd} PC={self.pc}')
             self.pc = pc_next
-            if self.tracing:
-                print(self.mem[35:45])
+
