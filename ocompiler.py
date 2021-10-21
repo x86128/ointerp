@@ -410,6 +410,7 @@ main_ptr = 0
 
 
 def optimize_int_const(text):
+    global c_mem, c_tab
     done = False
     while not done:
         done = True
@@ -417,24 +418,31 @@ def optimize_int_const(text):
             op3 = text[i]
             if op3[0] == 'BINOP':
                 op1 = text[i - 2]
-                if op1[0] != 'CONST':
+                if op1[0] != 'CLOAD':
                     continue
                 op2 = text[i - 1]
-                if op2[0] != 'CONST':
+                if op2[0] != 'CLOAD':
                     continue
                 head = text[:i - 2]
+                op1 = c_tab[c_mem[op1[1]]]['val']
+                op2 = c_tab[c_mem[op2[1]]]['val']
                 if op3[1] == '+':
-                    head.append(('CONST', op1[1] + op2[1]))
+                    op3 = op1 + op2
                 elif op3[1] == '-':
-                    head.append(('CONST', op1[1] - op2[1]))
+                    op3 = op1 - op2
                 elif op3[1] == '*':
-                    head.append(('CONST', op1[1] * op2[1]))
+                    op3 = op1 * op2
                 elif op3[1] == 'DIV':
-                    head.append(('CONST', int(op1[1] / op2[1])))
+                    op3 = int(op1 / op2)
                 elif op3[1] == 'MOD':
-                    head.append(('CONST', op1[1] % op2[1]))
+                    op3 = op1 % op2
                 else:
                     raise SyntaxError(f'Unknown BINOP in optimizer {op3}')
+                if op3 not in c_tab:
+                    c_mem.append(op3)
+                    c_tab[op3] = {'offset': len(c_mem) - 1, 'val': op3}
+                head.append(('CLOAD', c_tab[op3]['offset']))
+
                 head += text[i + 1:]
                 done = False
                 text = head
@@ -442,7 +450,7 @@ def optimize_int_const(text):
     return text
 
 
-def convert_expressions(text):
+def conv_ir_to_besm(text):
     output = []
     acc_busy = False
     M2 = 2
@@ -526,6 +534,8 @@ def convert_expressions(text):
             output.append(('UTM', -1, 1))
             # call
             output.append(('VJM', t[1], 14))
+        elif t[0] == 'BR':
+            output.append(('UJ', t[1], 0))
         elif t[0] == 'STOP':
             output.append(('STOP', int(t[1]), 0))
         elif t[0] == 'ENTER':
@@ -561,158 +571,6 @@ def convert_expressions(text):
             output.append(t)
 
     return output
-
-
-def convert_to_besm(text):
-    done = False
-    while not done:
-        done = True
-        l = len(text)
-        for i in range(l):
-            if text[i][0] == 'ALLOC':
-                text[i] = ('UTM', text[i][1], 15)
-                done = False
-                break
-            elif text[i][0] == 'DEALLOC':
-                text[i] = ('UTM', -text[i][1], 15)
-                done = False
-                break
-            elif text[i][0] == 'VLOAD':
-                addr = text[i][1]
-                text.pop(i)
-                text.insert(i, ('XTA', addr, 1))
-                text.insert(i + 1, ('ATX', 0, 15))
-                done = False
-                break
-            elif text[i][0] == 'VSTOR':
-                addr = text[i][1]
-                text.pop(i)
-                text.insert(i, ('XTA', 0, 15))
-                text.insert(i + 1, ('ATX', addr, 1))
-                done = False
-                break
-            elif text[i][0] == 'CLOAD':
-                addr = text[i][1]
-                text.pop(i)
-                text.insert(i, ('XTA', addr, 2))
-                text.insert(i + 1, ('ATX', 0, 15))
-                done = False
-                break
-            elif text[i][0] == 'SYSCALL':
-                text[i] = ('*77', system_procs[text[i][1]]['sys_num'], 0)
-                done = False
-                break
-            elif text[i][0] == 'STOP':
-                text[i] = ('STOP', int(text[i][1]), 0)
-            elif text[i][0] == 'CALL':
-                t = text[i]
-                text.pop(i)
-                # save M1
-                text.insert(i, ('ITA', 1, 0))
-                text.insert(i + 1, ('ATX', 0, 15))
-                # set M1 = SP - 1
-                text.insert(i + 2, ('MTJ', 1, 15))
-                text.insert(i + 3, ('UTM', -1, 1))
-                # call
-                text.insert(i + 4, ('VJM', t[1], 14))
-                done = False
-                break
-            elif text[i][0] == 'ENTER':
-                t = text[i]
-                text.pop(i)
-                # save return address M14
-                text.insert(i, ('ITA', 14, 0))
-                text.insert(i + 1, ('ATX', 0, 15))
-                done = False
-                break
-            elif text[i][0] == 'LEAVE':
-                t = text[i]
-                text.pop(i)
-                # get return address to M14
-                text.insert(i, ('XTA', 0, 15))
-                text.insert(i + 1, ('ATI', 14, 0))
-                done = False
-                break
-            elif text[i][0] == 'RETURN':
-                t = text[i]
-                text.pop(i)
-                # restore M1 address
-                text.insert(i, ('XTA', 0, 15))
-                text.insert(i + 1, ('ATI', 1, 0))
-                text.insert(i + 2, ('UJ', 0, 14))
-                done = False
-                break
-            elif text[i][0] == 'RELOP':
-                r = text.pop(i)
-                b = text.pop(i)
-                if r[1] == '>':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('X-A', -1, 15))
-                    text.insert(i + 2, ('ATX', -2, 15))
-                    text.insert(i + 3, ('UTM', -2, 15))
-                    text.insert(i + 4, ('UZA', b[1], 0))
-                elif r[1] == '<=':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('X-A', -1, 15))
-                    text.insert(i + 2, ('ATX', -2, 15))
-                    text.insert(i + 3, ('UTM', -2, 15))
-                    text.insert(i + 4, ('U1A', b[1], 0))
-                elif r[1] == '<':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A-X', -1, 15))
-                    text.insert(i + 2, ('ATX', -2, 15))
-                    text.insert(i + 3, ('UTM', -2, 15))
-                    text.insert(i + 4, ('UZA', b[1], 0))
-                elif r[1] == '>=':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A-X', -1, 15))
-                    text.insert(i + 2, ('ATX', -2, 15))
-                    text.insert(i + 3, ('UTM', -2, 15))
-                    text.insert(i + 4, ('U1A', b[1], 0))
-                elif r[1] == '=':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('AEX', -1, 15))
-                    text.insert(i + 2, ('ATX', -2, 15))
-                    text.insert(i + 3, ('UTM', -2, 15))
-                    text.insert(i + 4, ('U1A', b[1], 0))
-                elif r[1] == '#':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('AEX', -1, 15))
-                    text.insert(i + 2, ('ATX', -2, 15))
-                    text.insert(i + 3, ('UTM', -2, 15))
-                    text.insert(i + 4, ('UZA', b[1], 0))
-                else:
-                    raise RuntimeError(f"Unknown RELOP {r}")
-                done = False
-                break
-            elif text[i][0] == 'BINOP':
-                b = text.pop(i)
-                if b[1] == '-':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A-X', -1, 15))
-                elif b[1] == '+':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A+X', -1, 15))
-                elif b[1] == '*':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A*X', -1, 15))
-                elif b[1] == 'DIV':
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A/X', -1, 15))
-                elif b[1] == 'MOD':
-                    # fantasy instruction
-                    text.insert(i, ('XTA', -2, 15))
-                    text.insert(i + 1, ('A%X', -1, 15))
-                else:
-                    raise SyntaxError(f"Unknown BINOP: {b}")
-                text.insert(i + 2, ('ATX', -2, 15))
-                text.insert(i + 3, ('UTM', -1, 15))
-                done = False
-                break
-
-    print()
-    # pprint.pp(text)
-    return text
 
 
 def compile_module(ast):
@@ -753,9 +611,9 @@ def compile_module(ast):
         print(f"Модуль {ast.name} не может содержать процедуру с именем `{main_name}`")
         sys.exit(1)
 
-    pprint.pp(text)
     # do optimisations on IR code
-    # text = optimize(text)
+    text = optimize_int_const(text)
+    pprint.pp(text)
 
     # pprint.pprint(text)
     # convert IR to BESM-6 instructions
@@ -766,8 +624,7 @@ def compile_module(ast):
     crt0.append(('UJ', main_name, 0))
 
     text = crt0 + text
-    # text = convert_to_besm(text)
-    text = convert_expressions(text)
+    text = conv_ir_to_besm(text)
 
     # resolve labels
     pc = 0
